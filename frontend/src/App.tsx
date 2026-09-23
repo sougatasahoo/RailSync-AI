@@ -1,4 +1,4 @@
-import { useState } from "react"
+import { useEffect, useState } from "react"
 
 import OperationsOverview, {
   type PageKey,
@@ -20,6 +20,12 @@ const navigationItems: PageKey[] = [
   "Analytics & Reports",
   "Alerts & Notifications",
 ]
+
+type SystemStatusResponse = {
+  systems: Record<string, string>
+  total_systems: number
+  online_systems: number
+}
 
 function ModulePlaceholder({
   title,
@@ -45,9 +51,45 @@ function App() {
   const [activePage, setActivePage] =
     useState<PageKey>("Operations Overview")
 
+  const [systemStatus, setSystemStatus] =
+    useState<SystemStatusResponse | null>(null)
+
+  const [backendOnline, setBackendOnline] = useState(false)
+
   const navigateTo = (page: PageKey) => {
     setActivePage(page)
   }
+
+  useEffect(() => {
+    const loadSystemStatus = async () => {
+      try {
+        const response = await fetch(
+          "http://127.0.0.1:8000/api/system-status",
+        )
+
+        if (!response.ok) {
+          throw new Error("Unable to load system status")
+        }
+
+        const data: SystemStatusResponse = await response.json()
+
+        setSystemStatus(data)
+        setBackendOnline(true)
+      } catch {
+        setBackendOnline(false)
+        setSystemStatus(null)
+      }
+    }
+
+    loadSystemStatus()
+
+    const interval = window.setInterval(loadSystemStatus, 30000)
+
+    return () => window.clearInterval(interval)
+  }, [])
+
+  const onlineSystems = systemStatus?.online_systems ?? 0
+  const totalSystems = systemStatus?.total_systems ?? 0
 
   return (
     <div className="app-shell">
@@ -90,12 +132,25 @@ function App() {
           <div className="system-status">
             <div className="system-status-header">
               <span>SYSTEM STATUS</span>
-              <span className="status-dot" />
+
+              <span
+                className={`status-dot ${
+                  backendOnline ? "" : "status-dot-offline"
+                }`}
+              />
             </div>
 
-            <strong>7/7 systems online</strong>
+            <strong>
+              {backendOnline
+                ? `${onlineSystems}/${totalSystems} systems online`
+                : "Backend unavailable"}
+            </strong>
 
-            <small>Operational data synchronized</small>
+            <small>
+              {backendOnline
+                ? "Operational data synchronized"
+                : "Waiting for RailSync AI API"}
+            </small>
           </div>
 
           <div className="sidebar-user">
@@ -120,6 +175,7 @@ function App() {
           <div className="topbar-actions">
             <div className="global-search">
               <span>⌕</span>
+
               <input
                 type="text"
                 placeholder="Search requests, blocks, resources..."

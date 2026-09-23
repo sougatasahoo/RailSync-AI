@@ -9,10 +9,12 @@ app = FastAPI(
 )
 
 
-# Frontend development access
 app.add_middleware(
     CORSMiddleware,
-    allow_origins=["http://localhost:5173"],
+    allow_origins=[
+        "http://localhost:5173",
+        "http://127.0.0.1:5173",
+    ],
     allow_credentials=True,
     allow_methods=["*"],
     allow_headers=["*"],
@@ -38,16 +40,20 @@ def health_check():
 
 @app.get("/api/system-status")
 def system_status():
+    systems = {
+        "TMS": "online",
+        "SMMS": "online",
+        "TDMS": "online",
+        "COA": "online",
+        "HRMS": "online",
+        "TMMMS": "online",
+        "BDMS": "online",
+    }
+
     return {
-        "systems": {
-            "TMS": "online",
-            "SMMS": "online",
-            "TDMS": "online",
-            "COA": "online",
-            "HRMS": "online",
-            "TMMMS": "online",
-            "BDMS": "online",
-        },
-        "total_systems": 7,
-        "online_systems": 7,
+        "systems": systems,
+        "total_systems": len(systems),
+        "online_systems": sum(
+            1 for status in systems.values() if status == "online"
+        ),
     }

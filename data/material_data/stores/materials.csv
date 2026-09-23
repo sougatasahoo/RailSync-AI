@@ -1,0 +1,23 @@
+material_id,material_name,category,unit,available_quantity,reserved_quantity,reorder_level,store_location,availability_status,last_updated
+MAT-001,60kg Rail,Track Material,meter,2400,600,800,Kharagpur,Available,2026-09-27
+MAT-002,Concrete Sleeper,Track Material,piece,1850,450,700,Kharagpur,Available,2026-09-27
+MAT-003,Rail Fastening Set,Track Material,set,3200,900,1000,Kharagpur,Available,2026-09-27
+MAT-004,Ballast,Track Material,ton,420,180,200,Midnapore,Available,2026-09-27
+MAT-005,Drainage Grating,Drainage Material,piece,180,60,80,Kharagpur,Available,2026-09-27
+MAT-006,Signal Lamp,Signalling Material,piece,95,30,40,Kharagpur,Available,2026-09-27
+MAT-007,Signal Cable,Signalling Material,meter,2800,900,1000,Kharagpur,Available,2026-09-27
+MAT-008,Relay Module,Signalling Material,piece,38,18,20,Kharagpur,Limited,2026-09-27
+MAT-009,Track Circuit Cable,Signalling Material,meter,1900,700,800,Kharagpur,Available,2026-09-27
+MAT-010,Point Machine Spares,Signalling Material,set,24,12,15,Kharagpur,Limited,2026-09-27
+MAT-011,OHE Contact Wire,Electrical Material,meter,3100,800,1000,Kharagpur,Available,2026-09-27
+MAT-012,OHE Dropper,Electrical Material,piece,420,120,150,Kharagpur,Available,2026-09-27
+MAT-013,Section Insulator,Electrical Material,piece,32,14,18,Kharagpur,Limited,2026-09-27
+MAT-014,OHE Insulator,Electrical Material,piece,180,50,70,Kharagpur,Available,2026-09-27
+MAT-015,Feeder Cable,Electrical Material,meter,1500,500,600,Kharagpur,Available,2026-09-27
+MAT-016,Electrical Fuse Set,Electrical Material,set,75,25,30,Kharagpur,Available,2026-09-27
+MAT-017,Welding Electrode,Track Material,kg,260,80,100,Kharagpur,Available,2026-09-27
+MAT-018,Welding Consumables,Track Material,set,65,20,25,Kharagpur,Limited,2026-09-27
+MAT-019,Signal Cable Joint Kit,Signalling Material,set,16,10,12,Kharagpur,Limited,2026-09-27
+MAT-020,Traction Fuse Assembly,Electrical Material,set,14,8,10,Kharagpur,Below Reorder Level,2026-09-27
+MAT-021,Insulated Rail Joint,Track Material,piece,45,18,20,Kharagpur,Limited,2026-09-27
+MAT-022,Drainage Pipe,Drainage Material,meter,620,250,300,Midnapore,Available,2026-09-27

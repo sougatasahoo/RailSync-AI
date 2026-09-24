@@ -37,11 +37,8 @@ function ModulePlaceholder({
   return (
     <div className="page-placeholder">
       <div className="page-placeholder-icon">●</div>
-
       <h1>{title}</h1>
-
       <p>{description}</p>
-
       <span>Module foundation ready for implementation.</span>
     </div>
   )
@@ -83,7 +80,10 @@ function App() {
 
     loadSystemStatus()
 
-    const interval = window.setInterval(loadSystemStatus, 30000)
+    const interval = window.setInterval(
+      loadSystemStatus,
+      30000,
+    )
 
     return () => window.clearInterval(interval)
   }, [])
@@ -96,10 +96,18 @@ function App() {
       {/* Sidebar */}
       <aside className="app-sidebar">
         <div className="sidebar-brand">
-          <div className="sidebar-logo">RS</div>
+          <div className="sidebar-logo">
+            <img
+              src="/railsync-icon.png"
+              alt="RailSync AI"
+            />
+          </div>
 
           <div>
-            <div className="sidebar-title">RAILSYNC AI</div>
+            <div className="sidebar-title">
+              RAILSYNC AI
+            </div>
+
             <div className="sidebar-subtitle">
               Railway Operations Platform
             </div>
@@ -135,7 +143,9 @@ function App() {
 
               <span
                 className={`status-dot ${
-                  backendOnline ? "" : "status-dot-offline"
+                  backendOnline
+                    ? ""
+                    : "status-dot-offline"
                 }`}
               />
             </div>
@@ -154,11 +164,18 @@ function App() {
           </div>
 
           <div className="sidebar-user">
-            <div className="sidebar-avatar">BO</div>
+            <div className="sidebar-avatar">
+              BO
+            </div>
 
             <div>
-              <strong>Block Planning Official</strong>
-              <span>Operations Control</span>
+              <strong>
+                Block Planning Official
+              </strong>
+
+              <span>
+                Operations Control
+              </span>
             </div>
           </div>
         </div>
@@ -168,7 +185,10 @@ function App() {
       <main className="app-main">
         <header className="topbar">
           <div>
-            <span className="topbar-label">RAILWAY OPERATIONS</span>
+            <span className="topbar-label">
+              RAILWAY OPERATIONS
+            </span>
+
             <strong>{activePage}</strong>
           </div>
 
@@ -185,38 +205,57 @@ function App() {
             <button
               type="button"
               className="topbar-notification"
-              onClick={() => navigateTo("Alerts & Notifications")}
+              onClick={() =>
+                navigateTo("Alerts & Notifications")
+              }
               title="Open alerts and notifications"
             >
-              <span className="notification-icon">!</span>
-              <span className="notification-badge">3</span>
+              <span className="notification-icon">
+                !
+              </span>
+
+              <span className="notification-badge">
+                3
+              </span>
             </button>
           </div>
         </header>
 
         <div className="page-container">
           {activePage === "Operations Overview" && (
-            <OperationsOverview onNavigate={navigateTo} />
+            <OperationsOverview
+              onNavigate={navigateTo}
+            />
           )}
 
           {activePage === "Maintenance Requests" && (
-            <MaintenanceRequests onNavigate={navigateTo} />
+            <MaintenanceRequests
+              onNavigate={navigateTo}
+            />
           )}
 
           {activePage === "Block Planning" && (
-            <BlockPlanning onNavigate={navigateTo} />
+            <BlockPlanning
+              onNavigate={navigateTo}
+            />
           )}
 
           {activePage === "Resource Readiness" && (
-            <ResourceReadiness onNavigate={navigateTo} />
+            <ResourceReadiness
+              onNavigate={navigateTo}
+            />
           )}
 
           {activePage === "Analytics & Reports" && (
-            <AnalyticsReports onNavigate={navigateTo} />
+            <AnalyticsReports
+              onNavigate={navigateTo}
+            />
           )}
 
           {activePage === "Alerts & Notifications" && (
-            <AlertsNotifications onNavigate={navigateTo} />
+            <AlertsNotifications
+              onNavigate={navigateTo}
+            />
           )}
 
           {!navigationItems.includes(activePage) && (

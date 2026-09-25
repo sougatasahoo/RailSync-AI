@@ -60,7 +60,37 @@ def load_operational_windows() -> pd.DataFrame:
         .astype(str)
     )
 
+    frame["window_type"] = (
+        frame["window_type"]
+        .fillna("Unknown")
+        .astype(str)
+    )
+
+    frame["window_id"] = (
+        frame["window_id"]
+        .fillna("")
+        .astype(str)
+    )
+
     return frame
+
+
+def _safe_float(
+    value: object,
+    default: float = 0.0,
+) -> float:
+    """
+    Safely convert a value to float.
+    """
+
+    try:
+        if pd.isna(value):
+            return default
+
+        return float(value)
+
+    except (TypeError, ValueError):
+        return default
 
 
 def _find_matching_window(
@@ -68,25 +98,25 @@ def _find_matching_window(
     windows: pd.DataFrame,
 ) -> pd.Series | None:
     """
-    Find the COA window represented by a joint opportunity.
-
-    The opportunity already contains the selected window ID, so
-    the analysis uses that exact operational window when present.
+    Find the exact COA operational window represented by
+    the joint opportunity.
     """
 
     window_id = str(
         opportunity.get("window_id", "")
-    )
+    ).strip()
 
-    if window_id:
-        matches = windows[
-            windows["window_id"].astype(str) == window_id
-        ]
+    if not window_id:
+        return None
 
-        if not matches.empty:
-            return matches.iloc[0]
+    matches = windows[
+        windows["window_id"] == window_id
+    ]
 
-    return None
+    if matches.empty:
+        return None
+
+    return matches.iloc[0]
 
 
 def _build_conflict_result(
@@ -96,61 +126,123 @@ def _build_conflict_result(
     """
     Apply transparent prototype conflict rules to one
     joint planning opportunity.
+
+    Planning values come from the detected opportunity.
+    Operational indicators such as traffic and train counts
+    are validated against the matching COA window.
     """
 
     opportunity_id = str(
         opportunity.get("opportunity_id", "")
     )
 
-    available_hours = float(
-        opportunity.get("available_hours", 0.0)
+    # ---------------------------------------------------------
+    # AUTHORITATIVE PLANNING VALUES
+    # ---------------------------------------------------------
+    #
+    # These values already belong to the detected opportunity.
+    # Keep them intact instead of replacing them with defaults.
+    #
+    available_hours = _safe_float(
+        opportunity.get("available_hours"),
     )
 
-    required_hours = float(
-        opportunity.get("combined_duration_hours", 0.0)
+    required_hours = _safe_float(
+        opportunity.get(
+            "combined_duration_hours",
+            opportunity.get("duration_hours"),
+        ),
     )
 
-    utilization_percent = float(
-        opportunity.get("utilization_percent", 0.0)
+    utilization_percent = _safe_float(
+        opportunity.get("utilization_percent"),
     )
 
-    traffic_level = str(
-        opportunity.get("traffic_level", "Unknown")
+    opportunity_score = _safe_float(
+        opportunity.get("opportunity_score"),
     )
 
-    conflicts: list[dict] = []
+    opportunity_traffic = str(
+        opportunity.get(
+            "traffic_level",
+            "Unknown",
+        )
+    ).strip()
+
+    opportunity_window_type = str(
+        opportunity.get(
+            "window_type",
+            "Unknown",
+        )
+    ).strip()
+
+    opportunity_window_id = str(
+        opportunity.get(
+            "window_id",
+            "",
+        )
+    ).strip()
+
+    # ---------------------------------------------------------
+    # COA OPERATIONAL VALUES
+    # ---------------------------------------------------------
 
     passenger_train_count = 0
     goods_train_count = 0
+
     block_allowed = False
-    window_type = str(
-        opportunity.get("window_type", "Unknown")
-    )
+
+    traffic_level = opportunity_traffic
+    window_type = opportunity_window_type
 
     if window is not None:
         passenger_train_count = int(
-            window["passenger_train_count"]
+            _safe_float(
+                window.get(
+                    "passenger_train_count",
+                    0,
+                )
+            )
         )
 
         goods_train_count = int(
-            window["goods_train_count"]
+            _safe_float(
+                window.get(
+                    "goods_train_count",
+                    0,
+                )
+            )
         )
 
         block_allowed = bool(
-            window["block_allowed"]
+            window.get(
+                "block_allowed",
+                False,
+            )
         )
 
+        # COA is the authoritative source for these
+        # operational indicators.
         traffic_level = str(
-            window["traffic_level"]
-        )
+            window.get(
+                "traffic_level",
+                opportunity_traffic,
+            )
+        ).strip()
 
         window_type = str(
-            window["window_type"]
-        )
+            window.get(
+                "window_type",
+                opportunity_window_type,
+            )
+        ).strip()
+
+    conflicts: list[dict] = []
 
     # ---------------------------------------------------------
-    # Hard conflict: block is not allowed.
+    # HARD CONFLICT: BLOCK NOT ALLOWED
     # ---------------------------------------------------------
+
     if not block_allowed:
         conflicts.append(
             {
@@ -164,8 +256,9 @@ def _build_conflict_result(
         )
 
     # ---------------------------------------------------------
-    # Hard conflict: work does not fit into the window.
+    # HARD CONFLICT: INSUFFICIENT CAPACITY
     # ---------------------------------------------------------
+
     if required_hours > available_hours:
         conflicts.append(
             {
@@ -179,8 +272,9 @@ def _build_conflict_result(
         )
 
     # ---------------------------------------------------------
-    # Capacity pressure: 90%+ utilization requires review.
+    # CAPACITY PRESSURE
     # ---------------------------------------------------------
+
     if (
         required_hours <= available_hours
         and utilization_percent >= 90.0
@@ -197,11 +291,9 @@ def _build_conflict_result(
         )
 
     # ---------------------------------------------------------
-    # Prototype traffic rule.
-    #
-    # High traffic combined with daytime/restricted access
-    # is flagged for operational review.
+    # PROTOTYPE TRAFFIC RULE
     # ---------------------------------------------------------
+
     daytime_restricted = window_type in {
         "Restricted Day Window",
         "Short Engineering Window",
@@ -223,11 +315,9 @@ def _build_conflict_result(
         )
 
     # ---------------------------------------------------------
-    # Passenger/goods traffic review.
-    #
-    # These thresholds are prototype analysis rules and are
-    # not presented as railway operating policy.
+    # TRAIN ACTIVITY REVIEW
     # ---------------------------------------------------------
+
     total_train_count = (
         passenger_train_count
         + goods_train_count
@@ -252,8 +342,9 @@ def _build_conflict_result(
         )
 
     # ---------------------------------------------------------
-    # Determine overall status.
+    # DETERMINE OVERALL STATUS
     # ---------------------------------------------------------
+
     severities = {
         item["severity"]
         for item in conflicts
@@ -263,6 +354,7 @@ def _build_conflict_result(
         conflict_status = "Conflict"
         overall_severity = "Critical"
         can_proceed = False
+
         recommended_action = (
             "Do not propose this window without resolving "
             "the blocking operational constraint."
@@ -272,6 +364,7 @@ def _build_conflict_result(
         conflict_status = "Review"
         overall_severity = "High"
         can_proceed = False
+
         recommended_action = (
             "Review traffic conditions and obtain operational "
             "approval before scheduling."
@@ -281,6 +374,7 @@ def _build_conflict_result(
         conflict_status = "Review"
         overall_severity = "Medium"
         can_proceed = True
+
         recommended_action = (
             "Operational review recommended before final approval."
         )
@@ -289,6 +383,7 @@ def _build_conflict_result(
         conflict_status = "Clear"
         overall_severity = "Low"
         can_proceed = True
+
         recommended_action = (
             "No operational conflict detected from the "
             "available synthetic indicators."
@@ -296,11 +391,20 @@ def _build_conflict_result(
 
     return {
         "opportunity_id": opportunity_id,
+
         "conflict_status": conflict_status,
         "severity": overall_severity,
         "can_proceed": can_proceed,
         "conflict_count": len(conflicts),
         "conflicts": conflicts,
+
+        # Keep important planning values available to the
+        # frontend and optimizer.
+        "available_hours": available_hours,
+        "required_hours": required_hours,
+        "utilization_percent": utilization_percent,
+        "opportunity_score": opportunity_score,
+
         "operational_indicators": {
             "traffic_level": traffic_level,
             "passenger_train_count": passenger_train_count,
@@ -311,7 +415,9 @@ def _build_conflict_result(
             "available_hours": available_hours,
             "required_hours": required_hours,
             "utilization_percent": utilization_percent,
+            "opportunity_score": opportunity_score,
         },
+
         "recommended_action": recommended_action,
     }
 
@@ -323,6 +429,7 @@ def analyze_conflicts() -> list[dict]:
     """
 
     opportunities = detect_joint_opportunities()
+
     windows = load_operational_windows()
 
     results: list[dict] = []
@@ -338,22 +445,36 @@ def analyze_conflicts() -> list[dict]:
             window,
         )
 
-        # Include useful planning context alongside the
-        # conflict analysis.
+        # -----------------------------------------------------
+        # PLANNING CONTEXT
+        # -----------------------------------------------------
+
         result["section"] = str(
-            opportunity.get("section", "")
+            opportunity.get(
+                "section",
+                "",
+            )
         )
 
         result["date"] = str(
-            opportunity.get("date", "")
+            opportunity.get(
+                "date",
+                "",
+            )
         )
 
         result["window_id"] = str(
-            opportunity.get("window_id", "")
+            opportunity.get(
+                "window_id",
+                "",
+            )
         )
 
         result["window_type"] = str(
-            opportunity.get("window_type", "")
+            opportunity.get(
+                "window_type",
+                "",
+            )
         )
 
         result["request_ids"] = [
@@ -372,7 +493,27 @@ def analyze_conflicts() -> list[dict]:
             )
         ]
 
+        result["activities"] = [
+            str(activity)
+            for activity in opportunity.get(
+                "activities",
+                [],
+            )
+        ]
+
+        result["compatibility_reasons"] = [
+            str(reason)
+            for reason in opportunity.get(
+                "compatibility_reasons",
+                [],
+            )
+        ]
+
         results.append(result)
+
+    # ---------------------------------------------------------
+    # SORT BY OPERATIONAL IMPORTANCE
+    # ---------------------------------------------------------
 
     severity_order = {
         "Critical": 0,

@@ -23,23 +23,40 @@ type Opportunity = {
 
 type Conflict = {
   opportunity_id: string
-  request_ids: string[]
-  section: string
-  date: string
-  window_id: string
-  status: string
+  conflict_status: string
   severity: string
   can_proceed: boolean
-  traffic_level: string
-  passenger_train_count: number
-  goods_train_count: number
-  block_allowed: boolean
+  conflict_count: number
+  conflicts: {
+    code: string
+    severity: string
+    message: string
+  }[]
   available_hours: number
   required_hours: number
   utilization_percent: number
-  total_train_activity: number
-  conflict_reasons: string[]
-  recommendation: string
+  opportunity_score: number
+  operational_indicators: {
+    traffic_level: string
+    passenger_train_count: number
+    goods_train_count: number
+    total_train_count: number
+    block_allowed: boolean
+    window_type: string
+    available_hours: number
+    required_hours: number
+    utilization_percent: number
+    opportunity_score: number
+  }
+  recommended_action: string
+  section: string
+  date: string
+  window_id: string
+  window_type: string
+  request_ids: string[]
+  departments: string[]
+  activities: string[]
+  compatibility_reasons: string[]
 }
 
 type OptimizedItem = {
@@ -197,10 +214,13 @@ function statusStyle(
   switch (severity.toLowerCase()) {
     case "critical":
       return "border-red-200 bg-red-50 text-red-700"
+
     case "high":
       return "border-orange-200 bg-orange-50 text-orange-700"
+
     case "medium":
       return "border-amber-200 bg-amber-50 text-amber-700"
+
     default:
       return "border-emerald-200 bg-emerald-50 text-emerald-700"
   }
@@ -395,6 +415,7 @@ export default function BlockPlanning() {
         })
 
         setApproval(approvalData)
+
         setRemarks(
           approvalData.remarks ?? "",
         )
@@ -453,7 +474,7 @@ export default function BlockPlanning() {
   const reviewCount =
     conflicts.filter(
       (item) =>
-        item.status === "Review" ||
+        item.conflict_status === "Review" ||
         ["Medium", "High", "Critical"].includes(
           item.severity,
         ),
@@ -484,6 +505,7 @@ export default function BlockPlanning() {
       setError(
         "Remarks are required when returning the plan.",
       )
+
       return
     }
 
@@ -534,6 +556,7 @@ export default function BlockPlanning() {
         data as Approval
 
       setApproval(updated)
+
       setRemarks(
         updated.remarks ?? "",
       )
@@ -643,6 +666,7 @@ export default function BlockPlanning() {
 
           <div className="border-b border-slate-200 p-5">
             <div className="flex flex-col gap-2 md:flex-row md:items-center md:justify-between">
+
               <div>
                 <h2 className="text-xl font-bold text-slate-800">
                   AI Proposed Block Plan
@@ -658,10 +682,12 @@ export default function BlockPlanning() {
                 {optimized?.solver_status ??
                   "Loading"}
               </span>
+
             </div>
           </div>
 
           <div className="grid grid-cols-2 gap-3 p-5 lg:grid-cols-4">
+
             <Metric
               label="Candidates"
               value={String(
@@ -696,6 +722,7 @@ export default function BlockPlanning() {
               ).toFixed(2)}
               description="Optimization objective"
             />
+
           </div>
 
           <div className="grid gap-4 px-5 pb-5 lg:grid-cols-[1.1fr_0.9fr]">
@@ -744,6 +771,7 @@ export default function BlockPlanning() {
 
                           <div>
                             <div className="flex flex-wrap items-center gap-2">
+
                               <span className="font-bold text-slate-800">
                                 {
                                   item.opportunity_id
@@ -753,6 +781,7 @@ export default function BlockPlanning() {
                               <span className="rounded-full border border-emerald-200 bg-emerald-50 px-2 py-1 text-[10px] font-bold text-emerald-700">
                                 SELECTED
                               </span>
+
                             </div>
 
                             <div className="mt-1 text-sm font-semibold text-slate-600">
@@ -776,6 +805,7 @@ export default function BlockPlanning() {
                           </div>
 
                           <div className="flex gap-5">
+
                             <div>
                               <div className="text-[10px] font-bold uppercase text-slate-400">
                                 Duration
@@ -803,6 +833,7 @@ export default function BlockPlanning() {
                                 %
                               </div>
                             </div>
+
                           </div>
 
                         </div>
@@ -811,6 +842,7 @@ export default function BlockPlanning() {
                   )}
                 </div>
               )}
+
             </div>
 
             {/* DETAIL */}
@@ -834,6 +866,7 @@ export default function BlockPlanning() {
                   </div>
 
                   <div className="mt-4 grid grid-cols-2 gap-3">
+
                     <Info
                       label="Section"
                       value={
@@ -875,9 +908,11 @@ export default function BlockPlanning() {
                         selectedOpportunity.combined_duration_hours,
                       )} hr`}
                     />
+
                   </div>
 
                   <div className="mt-4 rounded-xl border border-blue-200 bg-blue-50 p-4">
+
                     <div className="text-xs font-bold uppercase text-[#155f8f]">
                       Compatibility
                     </div>
@@ -890,6 +925,7 @@ export default function BlockPlanning() {
                       ) ||
                         "Compatible maintenance activities identified."}
                     </div>
+
                   </div>
                 </>
               ) : (
@@ -899,6 +935,7 @@ export default function BlockPlanning() {
               )}
 
             </div>
+
           </div>
         </section>
 
@@ -908,6 +945,7 @@ export default function BlockPlanning() {
 
           <div className="border-b border-slate-200 p-5">
             <div className="flex flex-col gap-2 md:flex-row md:items-center md:justify-between">
+
               <div>
                 <h2 className="text-xl font-bold text-slate-800">
                   Human Approval
@@ -932,12 +970,14 @@ export default function BlockPlanning() {
                   " ",
                 ) ?? "PENDING REVIEW"}
               </span>
+
             </div>
           </div>
 
           <div className="space-y-4 p-5">
 
             <div className="grid gap-3 sm:grid-cols-2 lg:grid-cols-5">
+
               <Info
                 label="Approval ID"
                 value={
@@ -978,6 +1018,7 @@ export default function BlockPlanning() {
                   "unknown"
                 }
               />
+
             </div>
 
             <textarea
@@ -999,6 +1040,7 @@ export default function BlockPlanning() {
 
             {approval?.remarks && (
               <div className="rounded-xl bg-slate-50 p-4">
+
                 <div className="text-xs font-bold uppercase text-slate-500">
                   Latest Remarks
                 </div>
@@ -1014,6 +1056,7 @@ export default function BlockPlanning() {
                     )}
                   </div>
                 )}
+
               </div>
             )}
 
@@ -1088,6 +1131,7 @@ export default function BlockPlanning() {
 
           <div className="border-b border-slate-200 p-5">
             <div className="flex flex-col gap-2 md:flex-row md:items-center md:justify-between">
+
               <div>
                 <h2 className="text-xl font-bold text-slate-800">
                   BDMS Handoff
@@ -1104,6 +1148,7 @@ export default function BlockPlanning() {
                   ✓ Handoff Generated
                 </span>
               )}
+
             </div>
           </div>
 
@@ -1219,8 +1264,10 @@ export default function BlockPlanning() {
                 <div className="overflow-x-auto rounded-xl border border-slate-200">
 
                   <table className="w-full min-w-[700px] text-left">
+
                     <thead className="bg-slate-50">
                       <tr>
+
                         <th className="px-4 py-3 text-xs font-bold uppercase text-slate-500">
                           Opportunity
                         </th>
@@ -1240,10 +1287,12 @@ export default function BlockPlanning() {
                         <th className="px-4 py-3 text-xs font-bold uppercase text-slate-500">
                           Status
                         </th>
+
                       </tr>
                     </thead>
 
                     <tbody className="divide-y divide-slate-100">
+
                       {handoff.handoff_items.map(
                         (item) => (
                           <tr
@@ -1252,6 +1301,7 @@ export default function BlockPlanning() {
                             }
                             className="hover:bg-slate-50"
                           >
+
                             <td className="px-4 py-3 text-sm font-bold text-slate-800">
                               {
                                 item.opportunity_id
@@ -1267,6 +1317,7 @@ export default function BlockPlanning() {
                             </td>
 
                             <td className="px-4 py-3">
+
                               <div className="text-sm font-bold text-slate-800">
                                 {
                                   item.section
@@ -1278,6 +1329,7 @@ export default function BlockPlanning() {
                                   item.date,
                                 )}
                               </div>
+
                             </td>
 
                             <td className="px-4 py-3 text-sm font-bold text-slate-800">
@@ -1288,15 +1340,19 @@ export default function BlockPlanning() {
                             </td>
 
                             <td className="px-4 py-3">
+
                               <span className="rounded-full border border-emerald-200 bg-emerald-50 px-2.5 py-1 text-[11px] font-bold text-emerald-700">
                                 {
                                   item.handoff_status
                                 }
                               </span>
+
                             </td>
+
                           </tr>
                         ),
                       )}
+
                     </tbody>
                   </table>
 
@@ -1342,11 +1398,12 @@ export default function BlockPlanning() {
 
         </div>
 
-        {/* CONFLICTS */}
+        {/* CONFLICT ANALYSIS */}
 
         <section className="rounded-2xl border border-slate-200 bg-white shadow-sm">
 
           <div className="border-b border-slate-200 p-5">
+
             <h2 className="text-xl font-bold text-slate-800">
               Conflict Analysis
             </h2>
@@ -1354,232 +1411,561 @@ export default function BlockPlanning() {
             <p className="mt-1 text-sm font-medium text-slate-500">
               Operational checks applied to proposed opportunities.
             </p>
+
           </div>
 
-          <div className="divide-y divide-slate-100">
+          {/* 2/3 CONFLICT LIST + 1/3 DETAILS */}
 
-            {conflicts.length === 0 && (
-              <div className="p-6 text-center text-sm font-medium text-slate-500">
-                No conflict records available.
+          <div className="grid gap-0 lg:grid-cols-[2fr_1fr]">
+
+            {/* LEFT — CONFLICT LIST */}
+
+            <div className="border-b border-slate-200 lg:border-b-0 lg:border-r">
+
+              <div className="border-b border-slate-200 bg-slate-50 px-5 py-3">
+
+                <div className="text-sm font-bold text-slate-800">
+                  Operational Conflicts
+                </div>
+
+                <div className="mt-1 text-xs font-medium text-slate-500">
+                  Select a record to view its detailed review.
+                </div>
+
               </div>
-            )}
 
-            {conflicts.map(
-              (item) => (
-                <button
-                  key={
-                    item.opportunity_id
-                  }
-                  type="button"
-                  onClick={() =>
-                    setSelectedId(
-                      item.opportunity_id,
-                    )
-                  }
-                  className="w-full p-4 text-left transition hover:bg-slate-50"
-                >
-                  <div className="grid gap-3 md:grid-cols-[1fr_1fr_0.7fr_0.7fr_auto] md:items-center">
+              <div className="max-h-[560px] overflow-y-auto divide-y divide-slate-100">
 
-                    <div>
-                      <div className="text-sm font-bold text-slate-800">
-                        {
+                {conflicts.length === 0 && (
+                  <div className="p-6 text-center text-sm font-medium text-slate-500">
+                    No conflict records available.
+                  </div>
+                )}
+
+                {conflicts.map(
+                  (item) => {
+                    const isSelected =
+                      selectedId ===
+                      item.opportunity_id
+
+                    const traffic =
+                      item
+                        .operational_indicators
+                        ?.traffic_level ??
+                      "Unknown"
+
+                    const utilization =
+                      item
+                        .operational_indicators
+                        ?.utilization_percent ??
+                      item.utilization_percent
+
+                    return (
+                      <button
+                        key={
                           item.opportunity_id
                         }
-                      </div>
-
-                      <div className="mt-1 text-xs font-medium text-slate-500">
-                        {list(
-                          item.request_ids,
-                        ).join(
-                          " + ",
-                        )}
-                      </div>
-                    </div>
-
-                    <div>
-                      <div className="text-sm font-bold text-slate-700">
-                        {item.section}
-                      </div>
-
-                      <div className="text-xs text-slate-500">
-                        {dateText(
-                          item.date,
-                        )}{" "}
-                        ·{" "}
-                        {
-                          item.window_id
+                        type="button"
+                        onClick={() =>
+                          setSelectedId(
+                            item.opportunity_id,
+                          )
                         }
-                      </div>
-                    </div>
+                        className={`w-full p-4 text-left transition ${
+                          isSelected
+                            ? "bg-blue-50"
+                            : "bg-white hover:bg-slate-50"
+                        }`}
+                      >
 
-                    <div>
-                      <div className="text-[10px] font-bold uppercase text-slate-400">
-                        Utilization
-                      </div>
+                        <div className="grid gap-3 md:grid-cols-[1fr_1fr_0.7fr_0.7fr_auto] md:items-center">
 
-                      <div className="text-sm font-bold text-slate-800">
-                        {num(
-                          item.utilization_percent,
-                        ).toFixed(
-                          1,
-                        )}
-                        %
-                      </div>
-                    </div>
+                          {/* ID */}
 
-                    <div>
-                      <div className="text-[10px] font-bold uppercase text-slate-400">
-                        Traffic
-                      </div>
+                          <div>
 
-                      <div className="text-sm font-bold text-slate-800">
-                        {
-                          item.traffic_level
-                        }
-                      </div>
-                    </div>
+                            <div className="flex items-center gap-2">
 
-                    <span
-                      className={`w-fit rounded-full border px-3 py-1.5 text-xs font-bold ${statusStyle(
-                        item.severity,
-                      )}`}
-                    >
-                      {
-                        item.severity
-                      }
-                    </span>
+                              <div className="text-sm font-bold text-slate-800">
+                                {
+                                  item.opportunity_id
+                                }
+                              </div>
 
-                  </div>
-                </button>
-              ),
-            )}
+                              {isSelected && (
+                                <span className="rounded-full border border-blue-200 bg-blue-50 px-2 py-0.5 text-[9px] font-bold text-[#155f8f]">
+                                  SELECTED
+                                </span>
+                              )}
 
-          </div>
-        </section>
+                            </div>
 
-        {/* DETAIL */}
+                            <div className="mt-1 text-xs font-medium text-slate-500">
+                              {list(
+                                item.request_ids,
+                              ).join(
+                                " + ",
+                              )}
+                            </div>
 
-        {selectedConflict && (
-          <section className="rounded-2xl border border-slate-200 bg-white shadow-sm">
+                          </div>
 
-            <div className="border-b border-slate-200 p-5">
-              <div className="flex items-center justify-between gap-3">
+                          {/* LOCATION */}
 
-                <div>
-                  <h2 className="text-xl font-bold text-slate-800">
-                    Operational Review
-                  </h2>
+                          <div>
 
-                  <p className="mt-1 text-sm font-medium text-slate-500">
-                    {
-                      selectedConflict.opportunity_id
-                    }
-                  </p>
-                </div>
+                            <div className="text-sm font-bold text-slate-700">
+                              {
+                                item.section
+                              }
+                            </div>
 
-                <span
-                  className={`rounded-full border px-3 py-1.5 text-xs font-bold ${statusStyle(
-                    selectedConflict.severity,
-                  )}`}
-                >
-                  {
-                    selectedConflict.severity
-                  }
-                </span>
+                            <div className="text-xs text-slate-500">
+                              {dateText(
+                                item.date,
+                              )}{" "}
+                              ·{" "}
+                              {
+                                item.window_id
+                              }
+                            </div>
 
-              </div>
-            </div>
+                          </div>
 
-            <div className="grid gap-4 p-5 lg:grid-cols-2">
+                          {/* UTILIZATION */}
 
-              <div className="grid grid-cols-2 gap-3">
+                          <div>
 
-                <Info
-                  label="Traffic"
-                  value={
-                    selectedConflict.traffic_level
-                  }
-                />
+                            <div className="text-[10px] font-bold uppercase text-slate-400">
+                              Utilization
+                            </div>
 
-                <Info
-                  label="Block Allowed"
-                  value={
-                    selectedConflict.block_allowed
-                      ? "Yes"
-                      : "No"
-                  }
-                />
+                            <div className="text-sm font-bold text-slate-800">
+                              {num(
+                                utilization,
+                              ).toFixed(
+                                1,
+                              )}
+                              %
+                            </div>
 
-                <Info
-                  label="Available"
-                  value={`${num(
-                    selectedConflict.available_hours,
-                  )} hr`}
-                />
+                          </div>
 
-                <Info
-                  label="Required"
-                  value={`${num(
-                    selectedConflict.required_hours,
-                  )} hr`}
-                />
+                          {/* TRAFFIC */}
 
-                <Info
-                  label="Passenger Trains"
-                  value={String(
-                    num(
-                      selectedConflict.passenger_train_count,
-                    ),
-                  )}
-                />
+                          <div>
 
-                <Info
-                  label="Goods Trains"
-                  value={String(
-                    num(
-                      selectedConflict.goods_train_count,
-                    ),
-                  )}
-                />
+                            <div className="text-[10px] font-bold uppercase text-slate-400">
+                              Traffic
+                            </div>
 
-              </div>
+                            <div className="text-sm font-bold text-slate-800">
+                              {traffic}
+                            </div>
 
-              <div className="rounded-xl border border-slate-200 bg-slate-50 p-5">
+                          </div>
 
-                <div className="text-xs font-bold uppercase text-slate-500">
-                  Recommendation
-                </div>
+                          {/* SEVERITY */}
 
-                <div className="mt-2 text-sm font-bold leading-6 text-slate-800">
-                  {
-                    selectedConflict.recommendation
-                  }
-                </div>
+                          <span
+                            className={`w-fit rounded-full border px-3 py-1.5 text-xs font-bold ${statusStyle(
+                              item.severity,
+                            )}`}
+                          >
+                            {
+                              item.severity
+                            }
+                          </span>
 
-                {list(
-                  selectedConflict.conflict_reasons,
-                ).length > 0 && (
-                  <ul className="mt-4 space-y-2">
-                    {list(
-                      selectedConflict.conflict_reasons,
-                    ).map(
-                      (reason) => (
-                        <li
-                          key={reason}
-                          className="text-sm font-medium text-slate-600"
-                        >
-                          • {reason}
-                        </li>
-                      ),
-                    )}
-                  </ul>
+                        </div>
+
+                      </button>
+                    )
+                  },
                 )}
 
               </div>
 
             </div>
-          </section>
-        )}
+
+            {/* RIGHT — STICKY CONFLICT DETAILS */}
+
+            <div className="bg-slate-50">
+
+              <div className="sticky top-4">
+
+                <div className="border-b border-slate-200 bg-white px-5 py-4">
+
+                  <div className="flex items-center justify-between gap-3">
+
+                    <div>
+
+                      <h3 className="text-lg font-bold text-slate-800">
+                        Conflict Details
+                      </h3>
+
+                      <p className="mt-1 text-xs font-medium text-slate-500">
+                        Selected operational review
+                      </p>
+
+                    </div>
+
+                    {selectedConflict && (
+                      <span
+                        className={`rounded-full border px-3 py-1.5 text-xs font-bold ${statusStyle(
+                          selectedConflict.severity,
+                        )}`}
+                      >
+                        {
+                          selectedConflict.severity
+                        }
+                      </span>
+                    )}
+
+                  </div>
+
+                </div>
+
+                {selectedConflict ? (
+                  <div className="space-y-4 p-5">
+
+                    {/* SELECTED ID + ACTIVITIES */}
+
+                    <div>
+
+                      <div className="text-xl font-bold text-slate-800">
+                        {
+                          selectedConflict.opportunity_id
+                        }
+                      </div>
+
+                      <div className="mt-1 text-sm font-semibold leading-5 text-slate-600">
+                        {list(
+                          selectedConflict.activities,
+                        ).length > 0
+                          ? list(
+                              selectedConflict.activities,
+                            ).join(
+                              " + ",
+                            )
+                          : selectedOpportunity
+                            ? list(
+                                selectedOpportunity.activities,
+                              ).join(
+                                " + ",
+                              )
+                            : list(
+                                selectedConflict.request_ids,
+                              ).join(
+                                " + ",
+                              )}
+                      </div>
+
+                    </div>
+
+                    {/* KEY INFORMATION */}
+
+                    <div className="grid grid-cols-2 gap-3">
+
+                      <Info
+                        label="Section"
+                        value={
+                          selectedConflict.section
+                        }
+                      />
+
+                      <Info
+                        label="Date"
+                        value={dateText(
+                          selectedConflict.date,
+                        )}
+                      />
+
+                      <Info
+                        label="Window"
+                        value={
+                          selectedConflict.window_id
+                        }
+                      />
+
+                      <Info
+                        label="Traffic"
+                        value={
+                          selectedConflict
+                            .operational_indicators
+                            ?.traffic_level ??
+                          "Unknown"
+                        }
+                      />
+
+                      <Info
+                        label="Available"
+                        value={`${num(
+                          selectedConflict
+                            .operational_indicators
+                            ?.available_hours ??
+                            selectedConflict.available_hours,
+                        )} hr`}
+                      />
+
+                      <Info
+                        label="Required"
+                        value={`${num(
+                          selectedConflict
+                            .operational_indicators
+                            ?.required_hours ??
+                            selectedConflict.required_hours,
+                        )} hr`}
+                      />
+
+                    </div>
+
+                    {/* UTILIZATION */}
+
+                    <div className="rounded-xl border border-amber-200 bg-amber-50 p-4">
+
+                      <div className="flex items-center justify-between gap-3">
+
+                        <div>
+
+                          <div className="text-[11px] font-bold uppercase tracking-wide text-amber-700">
+                            Window Utilization
+                          </div>
+
+                          <div className="mt-1 text-2xl font-bold text-slate-800">
+                            {num(
+                              selectedConflict
+                                .operational_indicators
+                                ?.utilization_percent ??
+                                selectedConflict.utilization_percent,
+                            ).toFixed(
+                              1,
+                            )}
+                            %
+                          </div>
+
+                        </div>
+
+                        <div className="text-right">
+
+                          <div className="text-[11px] font-bold uppercase text-amber-700">
+                            Review Status
+                          </div>
+
+                          <div className="mt-1 text-sm font-bold text-amber-800">
+                            {
+                              selectedConflict.conflict_status
+                            }
+                          </div>
+
+                        </div>
+
+                      </div>
+
+                    </div>
+
+                    {/* OPERATIONAL STATUS */}
+
+                    <div className="rounded-xl border border-slate-200 bg-white p-4">
+
+                      <div className="text-xs font-bold uppercase tracking-wide text-slate-500">
+                        Operational Status
+                      </div>
+
+                      <div className="mt-3 grid grid-cols-2 gap-3">
+
+                        <div>
+
+                          <div className="text-[10px] font-bold uppercase text-slate-400">
+                            Block Allowed
+                          </div>
+
+                          <div className="mt-1 text-sm font-bold text-slate-800">
+                            {
+                              selectedConflict
+                                .operational_indicators
+                                ?.block_allowed
+                                ? "Yes"
+                                : "No"
+                            }
+                          </div>
+
+                        </div>
+
+                        <div>
+
+                          <div className="text-[10px] font-bold uppercase text-slate-400">
+                            Window Type
+                          </div>
+
+                          <div className="mt-1 text-sm font-bold text-slate-800">
+                            {
+                              selectedConflict
+                                .operational_indicators
+                                ?.window_type ??
+                              selectedConflict.window_type
+                            }
+                          </div>
+
+                        </div>
+
+                        <div>
+
+                          <div className="text-[10px] font-bold uppercase text-slate-400">
+                            Passenger Trains
+                          </div>
+
+                          <div className="mt-1 text-sm font-bold text-slate-800">
+                            {num(
+                              selectedConflict
+                                .operational_indicators
+                                ?.passenger_train_count,
+                            )}
+                          </div>
+
+                        </div>
+
+                        <div>
+
+                          <div className="text-[10px] font-bold uppercase text-slate-400">
+                            Goods Trains
+                          </div>
+
+                          <div className="mt-1 text-sm font-bold text-slate-800">
+                            {num(
+                              selectedConflict
+                                .operational_indicators
+                                ?.goods_train_count,
+                            )}
+                          </div>
+
+                        </div>
+
+                      </div>
+
+                    </div>
+
+                    {/* CONFLICT REASONS */}
+
+                    {list(
+                      selectedConflict.conflicts,
+                    ).length > 0 && (
+                      <div className="rounded-xl border border-amber-200 bg-amber-50 p-4">
+
+                        <div className="text-xs font-bold uppercase tracking-wide text-amber-700">
+                          Review Findings
+                        </div>
+
+                        <div className="mt-3 space-y-2">
+
+                          {selectedConflict.conflicts.map(
+                            (conflict) => (
+                              <div
+                                key={
+                                  conflict.code
+                                }
+                                className="rounded-lg border border-amber-200 bg-white p-3"
+                              >
+
+                                <div className="text-xs font-bold text-amber-800">
+                                  {
+                                    conflict.code
+                                  }
+                                </div>
+
+                                <div className="mt-1 text-sm font-medium leading-5 text-slate-700">
+                                  {
+                                    conflict.message
+                                  }
+                                </div>
+
+                              </div>
+                            ),
+                          )}
+
+                        </div>
+
+                      </div>
+                    )}
+
+                    {/* RECOMMENDATION */}
+
+                    <div className="rounded-xl border border-blue-200 bg-blue-50 p-4">
+
+                      <div className="text-xs font-bold uppercase tracking-wide text-[#155f8f]">
+                        Recommendation
+                      </div>
+
+                      <div className="mt-2 text-sm font-bold leading-6 text-slate-800">
+                        {
+                          selectedConflict.recommended_action
+                        }
+                      </div>
+
+                    </div>
+
+                    {/* COMPATIBILITY */}
+
+                    {(
+                      list(
+                        selectedConflict.compatibility_reasons,
+                      ).length > 0 ||
+                      selectedOpportunity
+                    ) && (
+                      <div className="rounded-xl border border-blue-200 bg-blue-50 p-4">
+
+                        <div className="text-xs font-bold uppercase tracking-wide text-[#155f8f]">
+                          Compatibility
+                        </div>
+
+                        <div className="mt-2 text-sm font-medium leading-6 text-slate-700">
+                          {list(
+                            selectedConflict.compatibility_reasons,
+                          ).length > 0
+                            ? list(
+                                selectedConflict.compatibility_reasons,
+                              ).join(
+                                " · ",
+                              )
+                            : selectedOpportunity
+                              ? list(
+                                  selectedOpportunity.compatibility_reasons,
+                                ).join(
+                                  " · ",
+                                )
+                              : "Compatible maintenance activities identified."}
+                        </div>
+
+                      </div>
+                    )}
+
+                  </div>
+                ) : (
+                  <div className="p-6">
+
+                    <div className="rounded-xl border border-dashed border-slate-300 bg-white p-8 text-center">
+
+                      <div className="text-sm font-bold text-slate-700">
+                        Select a conflict
+                      </div>
+
+                      <div className="mt-1 text-xs font-medium leading-5 text-slate-500">
+                        Choose an opportunity from the list to
+                        view its operational review details here.
+                      </div>
+
+                    </div>
+
+                  </div>
+                )}
+
+              </div>
+
+            </div>
+
+          </div>
+
+        </section>
 
         {/* WORKFLOW */}
 
@@ -1603,6 +1989,7 @@ export default function BlockPlanning() {
                   key={number}
                   className="rounded-xl border border-slate-200 bg-slate-50 p-4"
                 >
+
                   <div className="flex h-8 w-8 items-center justify-center rounded-lg bg-blue-50 text-xs font-bold text-[#155f8f]">
                     {number}
                   </div>
@@ -1610,6 +1997,7 @@ export default function BlockPlanning() {
                   <div className="mt-3 text-sm font-bold text-slate-800">
                     {title}
                   </div>
+
                 </div>
               ),
             )}

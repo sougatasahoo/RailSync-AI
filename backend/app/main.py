@@ -1,6 +1,7 @@
 from fastapi import FastAPI
 from fastapi.middleware.cors import CORSMiddleware
 
+from app.api.analytics import router as analytics_router
 from app.api.maintenance import router as maintenance_router
 from app.api.planning import router as planning_router
 from app.api.resources import router as resources_router
@@ -28,6 +29,7 @@ app.add_middleware(
 app.include_router(maintenance_router)
 app.include_router(planning_router)
 app.include_router(resources_router)
+app.include_router(analytics_router)
 
 
 @app.get("/")

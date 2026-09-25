@@ -1,834 +1,515 @@
-import { useState } from "react"
-import type { PageKey } from "./OperationsOverview"
-import {
-  Activity,
-  ArrowDownRight,
-  ArrowRight,
-  ArrowUpRight,
-  BarChart3,
-  CalendarDays,
-  CheckCircle2,
-  Clock3,
-  Download,
-  FileBarChart,
-  Gauge,
-  Layers3,
-  PackageCheck,
-  Route,
-  TrendingUp,
-  Users,
-  Wrench,
-} from "lucide-react"
+import { useEffect, useState } from "react"
+import "./AnalyticsReports.css"
 
-type AnalyticsReportsProps = {
-  onNavigate: (page: PageKey) => void
+const API_BASE = "http://127.0.0.1:8000"
+
+type AnalyticsSummary = {
+  block_utilization?: number
+  maintenance_total?: number
+  maintenance_completed?: number
+  joint_opportunities?: number
+  selected_opportunities?: number
+  unscheduled_opportunities?: number
+  resource_readiness?: number
+  conflict_reviews?: number
+  total_available_hours?: number
+  total_planned_hours?: number
+  total_opportunity_score?: number
 }
 
-type TrendPoint = {
-  label: string
-  value: number
+type UtilizationPoint = {
+  label?: string
+  value?: number
 }
 
-const weeklyUtilization: TrendPoint[] = [
-  { label: "Mon", value: 72 },
-  { label: "Tue", value: 78 },
-  { label: "Wed", value: 81 },
-  { label: "Thu", value: 76 },
-  { label: "Fri", value: 88 },
-  { label: "Sat", value: 84 },
-  { label: "Sun", value: 91 },
-]
-
-const departmentData = [
-  {
-    name: "TMS",
-    requests: 42,
-    completed: 37,
-    utilization: 88,
-  },
-  {
-    name: "SMMS",
-    requests: 31,
-    completed: 27,
-    utilization: 84,
-  },
-  {
-    name: "TDMS",
-    requests: 26,
-    completed: 23,
-    utilization: 91,
-  },
-]
+type DepartmentPerformance = {
+  name?: string
+  requests?: number
+  completed?: number
+  completion_percent?: number
+}
 
 type RecentOutcome = {
-  id: string
-  activity: string
-  corridor: string
-  date: string
-  requests: number
-  duration: string
-  utilization: string
-  status: "Completed" | "Approved"
+  id?: string
+  activity?: string
+  corridor?: string
+  date?: string
+  requests?: number
+  duration?: number
+  utilization?: number
+  status?: string
 }
 
-const recentOutcomes: RecentOutcome[] = [
-  {
-    id: "BLK-260922-04",
-    activity: "Kharagpur Yard Joint Maintenance",
-    corridor: "Kharagpur Yard",
-    date: "22 Sep 2026",
-    requests: 4,
-    duration: "2 hr",
-    utilization: "94%",
-    status: "Completed",
-  },
-  {
-    id: "BLK-260921-02",
-    activity: "OHE & Track Coordinated Window",
-    corridor: "Kharagpur–Jhargram",
-    date: "21 Sep 2026",
-    requests: 3,
-    duration: "2 hr 30 min",
-    utilization: "91%",
-    status: "Completed",
-  },
-  {
-    id: "BLK-260920-06",
-    activity: "Signal Maintenance Window",
-    corridor: "Howrah–Kharagpur",
-    date: "20 Sep 2026",
-    requests: 2,
-    duration: "1 hr 30 min",
-    utilization: "86%",
-    status: "Approved",
-  },
-  {
-    id: "BLK-260919-03",
-    activity: "Track Geometry Verification",
-    corridor: "Kharagpur–Balasore",
-    date: "19 Sep 2026",
-    requests: 2,
-    duration: "1 hr",
-    utilization: "89%",
-    status: "Completed",
-  },
-]
+type AnalyticsReport = {
+  status?: string
+  summary?: AnalyticsSummary
+  utilization_trend?: UtilizationPoint[]
+  department_performance?: DepartmentPerformance[]
+  recent_outcomes?: RecentOutcome[]
+  resource_summary?: {
+    total_resources?: number
+    ready_resources?: number
+    limited_resources?: number
+    unavailable_resources?: number
+  }
+  planning_summary?: {
+    candidate_count?: number
+    selected_count?: number
+    unscheduled_count?: number
+    total_planned_hours?: number
+    total_opportunity_score?: number
+  }
+  conflict_summary?: {
+    total?: number
+    review?: number
+    clear?: number
+  }
+}
 
-function AnalyticsReports({
-  onNavigate,
-}: AnalyticsReportsProps) {
-  const [period, setPeriod] = useState("Last 7 Days")
+function num(value: unknown, fallback = 0) {
+  const parsed = Number(value)
+  return Number.isFinite(parsed) ? parsed : fallback
+}
 
-  return (
-    <div className="space-y-6">
-      {/* Header */}
-      <section className="flex flex-col gap-4 xl:flex-row xl:items-end xl:justify-between">
-        <div>
-          <div className="mb-2 flex items-center gap-2 text-xs font-semibold uppercase tracking-[0.12em] text-slate-500">
-            <BarChart3 size={15} />
-            Performance Workspace
+function text(value: unknown, fallback = "—") {
+  return value === null || value === undefined || value === ""
+    ? fallback
+    : String(value)
+}
+
+export default function AnalyticsReports() {
+  const [report, setReport] = useState<AnalyticsReport | null>(null)
+  const [loading, setLoading] = useState(true)
+  const [error, setError] = useState("")
+
+  async function loadAnalytics() {
+    try {
+      setError("")
+
+      const response = await fetch(`${API_BASE}/api/analytics/report`)
+
+      if (!response.ok) {
+        throw new Error(`Analytics request failed: ${response.status}`)
+      }
+
+      const data: AnalyticsReport = await response.json()
+      setReport(data)
+    } catch (requestError) {
+      setError(
+        requestError instanceof Error
+          ? requestError.message
+          : "Unable to load analytics.",
+      )
+    } finally {
+      setLoading(false)
+    }
+  }
+
+  useEffect(() => {
+    loadAnalytics()
+
+    const interval = window.setInterval(loadAnalytics, 30000)
+
+    return () => window.clearInterval(interval)
+  }, [])
+
+  if (loading) {
+    return (
+      <section className="page-content">
+        <div className="page-header">
+          <div>
+            <h1>Analytics &amp; Reports</h1>
+            <p>Operational performance and planning insights.</p>
           </div>
-
-          <h1 className="text-2xl font-bold tracking-tight text-slate-900 sm:text-3xl">
-            Analytics & Reports
-          </h1>
-
-          <p className="mt-2 max-w-3xl text-sm leading-6 text-slate-600">
-            Monitor planning performance, maintenance outcomes and
-            how effectively available block windows are being used.
-          </p>
         </div>
 
-        <div className="flex flex-wrap gap-2">
-          <select
-            value={period}
-            onChange={(event) =>
-              setPeriod(event.target.value)
-            }
-            className="h-10 rounded-lg border border-slate-200 bg-white px-3 text-sm font-semibold text-slate-700 outline-none focus:border-[#1d5f8c] focus:ring-2 focus:ring-[#1d5f8c]/10"
-          >
-            <option>Last 7 Days</option>
-            <option>Last 30 Days</option>
-            <option>This Quarter</option>
-          </select>
+        <div className="analytics-loading">
+          Loading operational analytics...
+        </div>
+      </section>
+    )
+  }
 
-          <button className="inline-flex h-10 items-center justify-center gap-2 rounded-lg border border-slate-200 bg-white px-4 text-sm font-semibold text-slate-700 shadow-sm transition hover:bg-slate-50">
-            <Download size={16} />
-            Export Report
+  if (error || !report) {
+    return (
+      <section className="page-content">
+        <div className="page-header">
+          <div>
+            <h1>Analytics &amp; Reports</h1>
+            <p>Operational performance and planning insights.</p>
+          </div>
+        </div>
+
+        <div className="analytics-error">
+          <strong>Analytics unavailable</strong>
+          <span>{error || "No analytics data was returned."}</span>
+
+          <button type="button" onClick={loadAnalytics}>
+            Retry
           </button>
         </div>
       </section>
+    )
+  }
 
-      {/* Main KPIs */}
-      <section className="grid grid-cols-2 gap-3 xl:grid-cols-4">
-        <AnalyticsKpi
-          label="Block Utilization"
-          value="86%"
-          change="+8.4%"
-          detail="vs previous period"
-          icon={<Gauge size={18} />}
-          trend="up"
-        />
+  const summary = report.summary ?? {}
 
-        <AnalyticsKpi
-          label="Maintenance Completed"
-          value="87"
-          change="+12"
-          detail="activities completed"
-          icon={<CheckCircle2 size={18} />}
-          trend="up"
-        />
+  const blockUtilization = num(summary.block_utilization)
+  const maintenanceTotal = num(summary.maintenance_total)
+  const maintenanceCompleted = num(summary.maintenance_completed)
+  const jointOpportunities = num(summary.joint_opportunities)
+  const selectedOpportunities = num(summary.selected_opportunities)
+  const unscheduledOpportunities = num(summary.unscheduled_opportunities)
+  const resourceReadiness = num(summary.resource_readiness)
+  const availableHours = num(summary.total_available_hours)
+  const plannedHours = num(summary.total_planned_hours)
+  const opportunityScore = num(summary.total_opportunity_score)
 
-        <AnalyticsKpi
-          label="Joint Opportunities"
-          value="24"
-          change="+6"
-          detail="combined activities"
-          icon={<Layers3 size={18} />}
-          trend="up"
-        />
+  const utilizationTrend = Array.isArray(report.utilization_trend)
+    ? report.utilization_trend
+    : []
 
-        <AnalyticsKpi
-          label="Network Availability"
-          value="94.2%"
-          change="+2.1%"
-          detail="operational availability"
-          icon={<Activity size={18} />}
-          trend="up"
-        />
-      </section>
+  const departmentPerformance = Array.isArray(
+    report.department_performance,
+  )
+    ? report.department_performance
+    : []
 
-      {/* Main chart + insight */}
-      <section className="grid gap-4 xl:grid-cols-[minmax(0,1fr)_350px]">
-        {/* Utilization chart */}
-        <div className="rounded-xl border border-slate-200 bg-white p-5 shadow-sm">
-          <div className="flex flex-col gap-2 sm:flex-row sm:items-start sm:justify-between">
-            <div>
-              <h2 className="text-sm font-bold text-slate-900">
-                Block Utilization Trend
-              </h2>
+  const recentOutcomes = Array.isArray(report.recent_outcomes)
+    ? report.recent_outcomes
+    : []
 
-              <p className="mt-1 text-xs text-slate-500">
-                Percentage of available block time effectively
-                utilized.
-              </p>
-            </div>
+  const resourceSummary = report.resource_summary ?? {}
+  const planningSummary = report.planning_summary ?? {}
+  const conflictSummary = report.conflict_summary ?? {}
 
-            <span className="inline-flex w-fit items-center gap-1.5 rounded-full bg-emerald-50 px-2.5 py-1 text-[11px] font-bold text-emerald-700">
-              <TrendingUp size={12} />
-              Improving
-            </span>
-          </div>
-
-          <div className="mt-6">
-            <UtilizationChart />
-          </div>
-        </div>
-
-        {/* RailSync insight */}
-        <div className="rounded-xl border border-[#cfe1ed] bg-[#f1f7fa] p-5">
-          <div className="flex items-center gap-2">
-            <div className="flex h-9 w-9 items-center justify-center rounded-lg bg-[#dcecf5] text-[#1d5f8c]">
-              <Gauge size={18} />
-            </div>
-
-            <div>
-              <h2 className="text-sm font-bold text-[#123b5d]">
-                RailSync Insight
-              </h2>
-
-              <p className="text-[11px] text-[#567187]">
-                Planning performance
-              </p>
-            </div>
-          </div>
-
-          <div className="mt-5 space-y-4">
-            <InsightItem
-              value="24"
-              label="joint activities identified"
-              icon={<Layers3 size={15} />}
-            />
-
-            <InsightItem
-              value="18%"
-              label="less unused block time"
-              icon={<Clock3 size={15} />}
-            />
-
-            <InsightItem
-              value="31"
-              label="resource conflicts avoided"
-              icon={<ShieldIcon />}
-            />
-          </div>
-
-          <div className="mt-5 border-t border-[#d7e7f0] pt-4">
-            <p className="text-xs leading-5 text-[#567187]">
-              Coordinating compatible maintenance activities can
-              improve utilization of planned maintenance windows.
-            </p>
-          </div>
-        </div>
-      </section>
-
-      {/* Outcome metrics */}
-      <section className="grid gap-4 lg:grid-cols-3">
-        <OutcomeCard
-          title="Planning Efficiency"
-          value="89%"
-          detail="Plans completed without major revision"
-          icon={<FileBarChart size={18} />}
-          progress={89}
-        />
-
-        <OutcomeCard
-          title="Resource Utilization"
-          value="92%"
-          detail="Available resources used in planned work"
-          icon={<PackageCheck size={18} />}
-          progress={92}
-        />
-
-        <OutcomeCard
-          title="Schedule Reliability"
-          value="94%"
-          detail="Approved blocks executed as planned"
-          icon={<CalendarDays size={18} />}
-          progress={94}
-        />
-      </section>
-
-      {/* Department performance */}
-      <section className="rounded-xl border border-slate-200 bg-white shadow-sm">
-        <div className="border-b border-slate-200 px-5 py-4">
-          <h2 className="text-sm font-bold text-slate-900">
-            Department Performance
-          </h2>
-
-          <p className="mt-1 text-xs text-slate-500">
-            Maintenance activity and completion across connected
-            departments.
+  return (
+    <section className="page-content analytics-page">
+      <div className="page-header">
+        <div>
+          <h1>Analytics &amp; Reports</h1>
+          <p>
+            Operational performance, maintenance planning and resource
+            insights.
           </p>
         </div>
 
-        <div className="overflow-x-auto">
-          <table className="w-full min-w-[650px]">
-            <thead>
-              <tr className="border-b border-slate-100 bg-slate-50 text-left">
-                <th className="px-5 py-3 text-[11px] font-bold uppercase tracking-wide text-slate-400">
-                  Department
-                </th>
+        <div className="analytics-live-status">
+          <span className="analytics-live-dot" />
+          Live data
+        </div>
+      </div>
 
-                <th className="px-5 py-3 text-[11px] font-bold uppercase tracking-wide text-slate-400">
-                  Requests
-                </th>
+      <div className="analytics-kpi-grid">
+        <div className="analytics-kpi-card">
+          <span className="analytics-kpi-label">
+            Block Utilization
+          </span>
 
-                <th className="px-5 py-3 text-[11px] font-bold uppercase tracking-wide text-slate-400">
-                  Completed
-                </th>
+          <strong>{blockUtilization.toFixed(1)}%</strong>
 
-                <th className="px-5 py-3 text-[11px] font-bold uppercase tracking-wide text-slate-400">
-                  Completion
-                </th>
+          <span className="analytics-kpi-subtext">
+            Planned block hours / available hours
+          </span>
+        </div>
 
-                <th className="px-5 py-3 text-[11px] font-bold uppercase tracking-wide text-slate-400">
-                  Resource Utilization
-                </th>
-              </tr>
-            </thead>
+        <div className="analytics-kpi-card">
+          <span className="analytics-kpi-label">
+            Maintenance Requests
+          </span>
 
-            <tbody className="divide-y divide-slate-100">
-              {departmentData.map((department) => {
-                const completion = Math.round(
-                  (department.completed /
-                    department.requests) *
-                    100,
-                )
+          <strong>{maintenanceTotal}</strong>
+
+          <span className="analytics-kpi-subtext">
+            {maintenanceCompleted} completed in current dataset
+          </span>
+        </div>
+
+        <div className="analytics-kpi-card">
+          <span className="analytics-kpi-label">
+            Joint Opportunities
+          </span>
+
+          <strong>{jointOpportunities}</strong>
+
+          <span className="analytics-kpi-subtext">
+            {selectedOpportunities} selected for proposed plan
+          </span>
+        </div>
+
+        <div className="analytics-kpi-card">
+          <span className="analytics-kpi-label">
+            Resource Readiness
+          </span>
+
+          <strong>{resourceReadiness.toFixed(1)}%</strong>
+
+          <span className="analytics-kpi-subtext">
+            Manpower, machines and materials
+          </span>
+        </div>
+      </div>
+
+      <div className="analytics-main-grid">
+        <div className="analytics-card analytics-utilization-card">
+          <div className="analytics-card-header">
+            <div>
+              <h2>Block Utilization Trend</h2>
+              <p>Available operational window utilization.</p>
+            </div>
+
+            <span className="analytics-value-chip">
+              {blockUtilization.toFixed(1)}%
+            </span>
+          </div>
+
+          {utilizationTrend.length > 0 ? (
+            <div className="analytics-chart">
+              {utilizationTrend.map((item, index) => {
+                const value = num(item.value)
 
                 return (
-                  <tr
-                    key={department.name}
-                    className="hover:bg-slate-50"
+                  <div
+                    className="analytics-chart-column"
+                    key={`${text(item.label)}-${index}`}
                   >
-                    <td className="px-5 py-4">
-                      <div className="flex items-center gap-3">
-                        <div className="flex h-8 w-8 items-center justify-center rounded-lg bg-slate-100 text-slate-600">
-                          <Wrench size={15} />
-                        </div>
+                    <div className="analytics-chart-value">
+                      {value.toFixed(1)}%
+                    </div>
 
-                        <span className="text-sm font-bold text-slate-800">
-                          {department.name}
-                        </span>
-                      </div>
-                    </td>
+                    <div className="analytics-chart-track">
+                      <div
+                        className="analytics-chart-bar"
+                        style={{
+                          height: `${Math.min(
+                            100,
+                            Math.max(0, value),
+                          )}%`,
+                        }}
+                      />
+                    </div>
 
-                    <td className="px-5 py-4 text-sm font-semibold text-slate-700">
-                      {department.requests}
-                    </td>
-
-                    <td className="px-5 py-4 text-sm font-semibold text-slate-700">
-                      {department.completed}
-                    </td>
-
-                    <td className="px-5 py-4">
-                      <div className="flex items-center gap-3">
-                        <div className="h-1.5 w-20 overflow-hidden rounded-full bg-slate-100">
-                          <div
-                            className="h-full rounded-full bg-[#1d5f8c]"
-                            style={{
-                              width: `${completion}%`,
-                            }}
-                          />
-                        </div>
-
-                        <span className="text-xs font-bold text-slate-600">
-                          {completion}%
-                        </span>
-                      </div>
-                    </td>
-
-                    <td className="px-5 py-4">
-                      <span className="inline-flex items-center gap-1 text-sm font-semibold text-emerald-600">
-                        <TrendingUp size={14} />
-                        {department.utilization}%
-                      </span>
-                    </td>
-                  </tr>
+                    <span className="analytics-chart-label">
+                      {text(item.label)}
+                    </span>
+                  </div>
                 )
               })}
-            </tbody>
-          </table>
+            </div>
+          ) : (
+            <div className="analytics-empty">
+              No utilization trend data available.
+            </div>
+          )}
         </div>
-      </section>
 
-      {/* Recent outcomes */}
-      <section className="rounded-xl border border-slate-200 bg-white shadow-sm">
-        <div className="flex flex-col gap-2 border-b border-slate-200 px-5 py-4 sm:flex-row sm:items-center sm:justify-between">
+        <div className="analytics-card">
+          <div className="analytics-card-header">
+            <div>
+              <h2>Planning Summary</h2>
+              <p>Current optimization output.</p>
+            </div>
+          </div>
+
+          <div className="analytics-summary-list">
+            <div className="analytics-summary-row">
+              <span>Available block hours</span>
+              <strong>{availableHours.toFixed(1)} h</strong>
+            </div>
+
+            <div className="analytics-summary-row">
+              <span>Planned block hours</span>
+              <strong>{plannedHours.toFixed(1)} h</strong>
+            </div>
+
+            <div className="analytics-summary-row">
+              <span>Selected opportunities</span>
+              <strong>{selectedOpportunities}</strong>
+            </div>
+
+            <div className="analytics-summary-row">
+              <span>Unscheduled opportunities</span>
+              <strong>{unscheduledOpportunities}</strong>
+            </div>
+
+            <div className="analytics-summary-row">
+              <span>Opportunity score</span>
+              <strong>{opportunityScore.toFixed(2)}</strong>
+            </div>
+          </div>
+        </div>
+      </div>
+
+      <div className="analytics-card">
+        <div className="analytics-card-header">
           <div>
-            <h2 className="text-sm font-bold text-slate-900">
-              Recent Planning Outcomes
-            </h2>
-
-            <p className="mt-1 text-xs text-slate-500">
-              Recently completed or approved block plans.
+            <h2>Department Performance</h2>
+            <p>
+              Maintenance workload and completion status across
+              participating departments.
             </p>
           </div>
-
-          <button className="inline-flex items-center gap-1 text-xs font-semibold text-[#1d5f8c] hover:underline">
-            View all reports
-            <ArrowRight size={13} />
-          </button>
         </div>
 
-        <div className="divide-y divide-slate-100">
-          {recentOutcomes.map((outcome) => (
-            <OutcomeRow
-              key={outcome.id}
-              outcome={outcome}
-            />
-          ))}
-        </div>
-      </section>
+        {departmentPerformance.length > 0 ? (
+          <div className="analytics-table-wrap">
+            <table className="analytics-table">
+              <thead>
+                <tr>
+                  <th>Department</th>
+                  <th>Requests</th>
+                  <th>Completed</th>
+                  <th>Completion</th>
+                </tr>
+              </thead>
 
-      {/* Quick reports */}
-      <section>
-        <div className="mb-3">
-          <h2 className="text-base font-bold text-slate-900">
-            Quick Reports
-          </h2>
+              <tbody>
+                {departmentPerformance.map((item, index) => {
+                  const completion = num(item.completion_percent)
 
-          <p className="mt-1 text-xs text-slate-500">
-            Generate commonly used planning and operational reports.
-          </p>
-        </div>
+                  return (
+                    <tr key={`${text(item.name)}-${index}`}>
+                      <td>
+                        <strong>{text(item.name)}</strong>
+                      </td>
 
-        <div className="grid gap-3 md:grid-cols-2 xl:grid-cols-4">
-          <ReportCard
-            title="Weekly Block Report"
-            description="Utilization, completed work and exceptions"
-            icon={<CalendarDays size={18} />}
-          />
+                      <td>{num(item.requests)}</td>
 
-          <ReportCard
-            title="Maintenance Summary"
-            description="Department-wise maintenance performance"
-            icon={<Wrench size={18} />}
-          />
+                      <td>{num(item.completed)}</td>
 
-          <ReportCard
-            title="Resource Report"
-            description="Manpower, machines and materials"
-            icon={<Users size={18} />}
-          />
+                      <td>
+                        <div className="analytics-readiness-cell">
+                          <span>
+                            {completion.toFixed(1)}%
+                          </span>
 
-          <ReportCard
-            title="Availability Report"
-            description="Network availability and block impact"
-            icon={<Route size={18} />}
-          />
-        </div>
-      </section>
-
-      {/* Navigation */}
-      <div className="flex flex-wrap gap-2 rounded-xl border border-slate-200 bg-white p-4">
-        <button
-          onClick={() =>
-            onNavigate("Block Planning")
-          }
-          className="inline-flex h-10 items-center gap-2 rounded-lg bg-[#123b5d] px-4 text-sm font-semibold text-white transition hover:bg-[#0d304b]"
-        >
-          <CalendarDays size={16} />
-          Open Block Planning
-        </button>
-
-        <button
-          onClick={() =>
-            onNavigate("Maintenance Requests")
-          }
-          className="inline-flex h-10 items-center gap-2 rounded-lg border border-slate-200 bg-white px-4 text-sm font-semibold text-slate-700 transition hover:bg-slate-50"
-        >
-          <Wrench size={16} />
-          View Maintenance
-        </button>
-
-        <button
-          onClick={() =>
-            onNavigate("Resource Readiness")
-          }
-          className="inline-flex h-10 items-center gap-2 rounded-lg border border-slate-200 bg-white px-4 text-sm font-semibold text-slate-700 transition hover:bg-slate-50"
-        >
-          <PackageCheck size={16} />
-          Resource Readiness
-        </button>
+                          <div className="analytics-mini-track">
+                            <div
+                              className="analytics-mini-bar"
+                              style={{
+                                width: `${Math.min(
+                                  100,
+                                  Math.max(0, completion),
+                                )}%`,
+                              }}
+                            />
+                          </div>
+                        </div>
+                      </td>
+                    </tr>
+                  )
+                })}
+              </tbody>
+            </table>
+          </div>
+        ) : (
+          <div className="analytics-empty">
+            No department performance data available.
+          </div>
+        )}
       </div>
 
-      {/* Prototype note */}
-      <div className="flex items-start gap-3 rounded-lg border border-slate-200 bg-white px-4 py-3 text-xs leading-5 text-slate-500">
-        <Gauge
-          size={16}
-          className="mt-0.5 shrink-0 text-[#1d5f8c]"
-        />
-
-        <span>
-          Analytics shown here use representative prototype data.
-          Connected operational data will populate the reports and
-          performance indicators in the final system.
-        </span>
-      </div>
-    </div>
-  )
-}
-
-function AnalyticsKpi({
-  label,
-  value,
-  change,
-  detail,
-  icon,
-  trend,
-}: {
-  label: string
-  value: string
-  change: string
-  detail: string
-  icon: React.ReactNode
-  trend: "up" | "down"
-}) {
-  return (
-    <div className="rounded-xl border border-slate-200 bg-white p-4 shadow-sm">
-      <div className="flex items-start justify-between gap-3">
-        <div>
-          <p className="text-xs font-semibold text-slate-500">
-            {label}
-          </p>
-
-          <p className="mt-1 text-2xl font-bold tracking-tight text-slate-900">
-            {value}
-          </p>
+      <div className="analytics-card">
+        <div className="analytics-card-header">
+          <div>
+            <h2>Recent Planning Outcomes</h2>
+            <p>Latest generated planning results.</p>
+          </div>
         </div>
 
-        <div className="flex h-9 w-9 items-center justify-center rounded-lg bg-[#eef6fb] text-[#1d5f8c]">
-          {icon}
-        </div>
-      </div>
-
-      <div className="mt-2 flex items-center gap-2">
-        <span
-          className={`inline-flex items-center gap-0.5 text-xs font-bold ${
-            trend === "up"
-              ? "text-emerald-600"
-              : "text-red-600"
-          }`}
-        >
-          {trend === "up" ? (
-            <ArrowUpRight size={13} />
-          ) : (
-            <ArrowDownRight size={13} />
-          )}
-
-          {change}
-        </span>
-
-        <span className="text-xs text-slate-400">
-          {detail}
-        </span>
-      </div>
-    </div>
-  )
-}
-
-function UtilizationChart() {
-  return (
-    <div>
-      <div className="relative h-56">
-        <div className="absolute inset-0 flex flex-col justify-between">
-          {[100, 75, 50, 25, 0].map((value) => (
-            <div
-              key={value}
-              className="flex items-center gap-3"
-            >
-              <span className="w-7 text-right text-[10px] font-medium text-slate-400">
-                {value}%
-              </span>
-
-              <div className="h-px flex-1 bg-slate-100" />
-            </div>
-          ))}
-        </div>
-
-        <div className="absolute bottom-0 left-10 right-0 top-0 flex items-end justify-between gap-2 px-2">
-          {weeklyUtilization.map((point) => {
-            const height =
-              `${Math.max(point.value * 0.92, 8)}%`
-
-            return (
+        {recentOutcomes.length > 0 ? (
+          <div className="analytics-outcomes">
+            {recentOutcomes.map((item, index) => (
               <div
-                key={point.label}
-                className="flex h-full flex-1 flex-col items-center justify-end gap-2"
+                className="analytics-outcome-row"
+                key={item.id || index}
               >
-                <div className="flex h-full w-full items-end justify-center">
-                  <div
-                    className="w-full max-w-9 rounded-t-md bg-[#1d5f8c] transition hover:bg-[#164d73]"
-                    style={{
-                      height,
-                    }}
-                    title={`${point.label}: ${point.value}%`}
-                  />
+                <div className="analytics-outcome-main">
+                  <strong>{text(item.activity)}</strong>
+
+                  <span>
+                    {text(item.corridor)} · {text(item.date)}
+                  </span>
+
+                  <span>
+                    {num(item.requests)} requests ·{" "}
+                    {num(item.duration).toFixed(1)} h
+                  </span>
                 </div>
 
-                <span className="text-[10px] font-semibold text-slate-400">
-                  {point.label}
-                </span>
+                <div className="analytics-outcome-right">
+                  <span className="analytics-result-badge">
+                    {text(item.status)}
+                  </span>
+
+                  <span className="analytics-outcome-utilization">
+                    {num(item.utilization).toFixed(1)}%
+                  </span>
+                </div>
               </div>
-            )
-          })}
-        </div>
-      </div>
-    </div>
-  )
-}
-
-function InsightItem({
-  value,
-  label,
-  icon,
-}: {
-  value: string
-  label: string
-  icon: React.ReactNode
-}) {
-  return (
-    <div className="flex items-center gap-3">
-      <div className="flex h-8 w-8 shrink-0 items-center justify-center rounded-lg bg-white text-[#1d5f8c] shadow-sm">
-        {icon}
-      </div>
-
-      <div>
-        <span className="text-lg font-bold text-[#123b5d]">
-          {value}
-        </span>
-
-        <p className="text-xs text-[#567187]">
-          {label}
-        </p>
-      </div>
-    </div>
-  )
-}
-
-function OutcomeCard({
-  title,
-  value,
-  detail,
-  icon,
-  progress,
-}: {
-  title: string
-  value: string
-  detail: string
-  icon: React.ReactNode
-  progress: number
-}) {
-  return (
-    <div className="rounded-xl border border-slate-200 bg-white p-5 shadow-sm">
-      <div className="flex items-start justify-between">
-        <div className="flex h-9 w-9 items-center justify-center rounded-lg bg-slate-100 text-slate-600">
-          {icon}
-        </div>
-
-        <span className="text-xl font-bold text-slate-900">
-          {value}
-        </span>
-      </div>
-
-      <h3 className="mt-4 text-sm font-bold text-slate-900">
-        {title}
-      </h3>
-
-      <p className="mt-1 text-xs leading-5 text-slate-500">
-        {detail}
-      </p>
-
-      <div className="mt-4 h-1.5 overflow-hidden rounded-full bg-slate-100">
-        <div
-          className="h-full rounded-full bg-[#1d5f8c]"
-          style={{
-            width: `${progress}%`,
-          }}
-        />
-      </div>
-    </div>
-  )
-}
-
-function OutcomeRow({
-  outcome,
-}: {
-  outcome: RecentOutcome
-}) {
-  return (
-    <div className="flex flex-col gap-3 px-5 py-4 transition hover:bg-slate-50 lg:flex-row lg:items-center">
-      <div className="flex min-w-0 flex-1 items-start gap-3">
-        <div className="flex h-9 w-9 shrink-0 items-center justify-center rounded-lg bg-emerald-50 text-emerald-600">
-          <CheckCircle2 size={17} />
-        </div>
-
-        <div className="min-w-0">
-          <div className="flex flex-wrap items-center gap-2">
-            <span className="text-[10px] font-bold tracking-wide text-slate-400">
-              {outcome.id}
-            </span>
-
-            <span className="rounded-full bg-emerald-50 px-2 py-1 text-[10px] font-bold text-emerald-700">
-              {outcome.status}
-            </span>
+            ))}
           </div>
+        ) : (
+          <div className="analytics-empty">
+            No recent outcomes available.
+          </div>
+        )}
+      </div>
 
-          <h3 className="mt-1 text-sm font-bold text-slate-900">
-            {outcome.activity}
-          </h3>
+      <div className="analytics-insights-grid">
+        <div className="analytics-insight-card">
+          <span className="analytics-insight-title">
+            Resource Pool
+          </span>
 
-          <p className="mt-1 text-xs text-slate-500">
-            {outcome.corridor} · {outcome.date}
+          <strong>
+            {num(resourceSummary.ready_resources)} /{" "}
+            {num(resourceSummary.total_resources)}
+          </strong>
+
+          <p>
+            Resources currently ready for operational planning.
+          </p>
+        </div>
+
+        <div className="analytics-insight-card">
+          <span className="analytics-insight-title">
+            Selected Plan
+          </span>
+
+          <strong>
+            {num(planningSummary.selected_count)}
+          </strong>
+
+          <p>
+            Joint opportunities selected by the current optimizer.
+          </p>
+        </div>
+
+        <div className="analytics-insight-card">
+          <span className="analytics-insight-title">
+            Conflict Reviews
+          </span>
+
+          <strong>
+            {num(conflictSummary.review)}
+          </strong>
+
+          <p>
+            Opportunities requiring operational review in the
+            current analysis.
           </p>
         </div>
       </div>
 
-      <div className="grid grid-cols-3 gap-5 pl-12 lg:w-[330px] lg:pl-0">
-        <OutcomeMetric
-          label="Activities"
-          value={String(outcome.requests)}
-        />
+      <div className="analytics-note">
+        <strong>Prototype data note:</strong>
 
-        <OutcomeMetric
-          label="Duration"
-          value={outcome.duration}
-        />
-
-        <OutcomeMetric
-          label="Utilization"
-          value={outcome.utilization}
-        />
+        <span>
+          Analytics are generated from the current synthetic railway
+          datasets and RailSync AI planning services.
+        </span>
       </div>
-    </div>
+    </section>
   )
 }
-
-function OutcomeMetric({
-  label,
-  value,
-}: {
-  label: string
-  value: string
-}) {
-  return (
-    <div>
-      <p className="text-[10px] font-semibold uppercase tracking-wide text-slate-400">
-        {label}
-      </p>
-
-      <p className="mt-1 text-sm font-bold text-slate-700">
-        {value}
-      </p>
-    </div>
-  )
-}
-
-function ReportCard({
-  title,
-  description,
-  icon,
-}: {
-  title: string
-  description: string
-  icon: React.ReactNode
-}) {
-  return (
-    <button className="group rounded-xl border border-slate-200 bg-white p-4 text-left shadow-sm transition hover:border-[#cfe1ed] hover:bg-[#f8fbfd]">
-      <div className="flex items-start justify-between gap-3">
-        <div className="flex h-9 w-9 items-center justify-center rounded-lg bg-[#eef6fb] text-[#1d5f8c]">
-          {icon}
-        </div>
-
-        <ArrowRight
-          size={16}
-          className="text-slate-300 transition group-hover:translate-x-0.5 group-hover:text-[#1d5f8c]"
-        />
-      </div>
-
-      <h3 className="mt-4 text-sm font-bold text-slate-900">
-        {title}
-      </h3>
-
-      <p className="mt-1 text-xs leading-5 text-slate-500">
-        {description}
-      </p>
-    </button>
-  )
-}
-
-function ShieldIcon() {
-  return <ShieldIconSvg />
-}
-
-function ShieldIconSvg() {
-  return (
-    <svg
-      width="15"
-      height="15"
-      viewBox="0 0 24 24"
-      fill="none"
-      stroke="currentColor"
-      strokeWidth="2"
-      strokeLinecap="round"
-      strokeLinejoin="round"
-      aria-hidden="true"
-    >
-      <path d="M12 3 5 6v5c0 4.5 2.9 8.4 7 10 4.1-1.6 7-5.5 7-10V6l-7-3Z" />
-      <path d="m9 12 2 2 4-4" />
-    </svg>
-  )
-}
-
-export default AnalyticsReports

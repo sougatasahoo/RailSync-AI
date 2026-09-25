@@ -3,6 +3,7 @@ from fastapi.middleware.cors import CORSMiddleware
 
 from app.api.maintenance import router as maintenance_router
 from app.api.planning import router as planning_router
+from app.api.resources import router as resources_router
 
 
 app = FastAPI(
@@ -24,13 +25,9 @@ app.add_middleware(
 )
 
 
-app.include_router(
-    maintenance_router
-)
-
-app.include_router(
-    planning_router
-)
+app.include_router(maintenance_router)
+app.include_router(planning_router)
+app.include_router(resources_router)
 
 
 @app.get("/")

@@ -22,7 +22,8 @@ import pandas as pd
 #       - HRMS manpower
 #       - TMMMS machines
 #       - Stores materials
-# 4. Produce a unified set of planning records.
+# 4. Normalize missing values for safe downstream use.
+# 5. Produce a unified set of planning records.
 # ============================================================
 
 
@@ -99,8 +100,17 @@ def load_operational_data() -> pd.DataFrame:
         errors="coerce",
     ).dt.date
 
-    dataframe["start_time"] = dataframe["start_time"].astype(str)
-    dataframe["end_time"] = dataframe["end_time"].astype(str)
+    dataframe["start_time"] = (
+        dataframe["start_time"]
+        .fillna("")
+        .astype(str)
+    )
+
+    dataframe["end_time"] = (
+        dataframe["end_time"]
+        .fillna("")
+        .astype(str)
+    )
 
     dataframe["available_hours"] = pd.to_numeric(
         dataframe["available_hours"],
@@ -127,6 +137,37 @@ def load_operational_data() -> pd.DataFrame:
                 "false": False,
             }
         )
+        .fillna(False)
+    )
+
+    dataframe["section"] = (
+        dataframe["section"]
+        .fillna("")
+        .astype(str)
+    )
+
+    dataframe["location"] = (
+        dataframe["location"]
+        .fillna("")
+        .astype(str)
+    )
+
+    dataframe["window_type"] = (
+        dataframe["window_type"]
+        .fillna("")
+        .astype(str)
+    )
+
+    dataframe["traffic_level"] = (
+        dataframe["traffic_level"]
+        .fillna("")
+        .astype(str)
+    )
+
+    dataframe["notes"] = (
+        dataframe["notes"]
+        .fillna("")
+        .astype(str)
     )
 
     return dataframe
@@ -136,6 +177,10 @@ def load_maintenance_data() -> pd.DataFrame:
     """
     Combine TMS, SMMS and TDMS into one common maintenance
     dataset.
+
+    Missing optional values are normalized so downstream
+    services and FastAPI JSON responses never receive
+    pandas NaN values.
     """
 
     datasets = []
@@ -182,6 +227,46 @@ def load_maintenance_data() -> pd.DataFrame:
                 "false": False,
             }
         )
+        .fillna(False)
+    )
+
+    # --------------------------------------------------------
+    # Normalize optional text fields.
+    #
+    # Pandas represents empty CSV cells as NaN. NaN is not
+    # valid JSON, so convert optional fields to safe strings.
+    # --------------------------------------------------------
+
+    text_columns = [
+        "required_machine",
+        "required_materials",
+        "operational_impact",
+        "activity",
+        "asset_type",
+        "asset_id",
+        "location",
+        "section",
+        "priority",
+        "status",
+    ]
+
+    for column in text_columns:
+        if column in maintenance.columns:
+            maintenance[column] = (
+                maintenance[column]
+                .fillna("")
+                .astype(str)
+            )
+
+    # Keep required numeric fields safe as well.
+    maintenance["estimated_duration_hours"] = (
+        maintenance["estimated_duration_hours"]
+        .fillna(0.0)
+    )
+
+    maintenance["required_manpower"] = (
+        maintenance["required_manpower"]
+        .fillna(0)
     )
 
     return maintenance
@@ -200,12 +285,12 @@ def load_manpower_data() -> pd.DataFrame:
     dataframe["assigned_hours"] = pd.to_numeric(
         dataframe["assigned_hours"],
         errors="coerce",
-    )
+    ).fillna(0)
 
     dataframe["max_daily_hours"] = pd.to_numeric(
         dataframe["max_daily_hours"],
         errors="coerce",
-    )
+    ).fillna(0)
 
     dataframe["remaining_hours"] = (
         dataframe["max_daily_hours"]
@@ -233,12 +318,12 @@ def load_machine_data() -> pd.DataFrame:
     dataframe["assigned_hours"] = pd.to_numeric(
         dataframe["assigned_hours"],
         errors="coerce",
-    )
+    ).fillna(0)
 
     dataframe["max_daily_hours"] = pd.to_numeric(
         dataframe["max_daily_hours"],
         errors="coerce",
-    )
+    ).fillna(0)
 
     dataframe["remaining_hours"] = (
         dataframe["max_daily_hours"]
@@ -256,17 +341,17 @@ def load_material_data() -> pd.DataFrame:
     dataframe["available_quantity"] = pd.to_numeric(
         dataframe["available_quantity"],
         errors="coerce",
-    )
+    ).fillna(0)
 
     dataframe["reserved_quantity"] = pd.to_numeric(
         dataframe["reserved_quantity"],
         errors="coerce",
-    )
+    ).fillna(0)
 
     dataframe["reorder_level"] = pd.to_numeric(
         dataframe["reorder_level"],
         errors="coerce",
-    )
+    ).fillna(0)
 
     dataframe["usable_quantity"] = (
         dataframe["available_quantity"]
@@ -477,28 +562,36 @@ def build_fused_request(
                 material["material_name"]
             )
 
+    required_machine = maintenance_request[
+        "required_machine"
+    ]
+
+    required_materials = maintenance_request[
+        "required_materials"
+    ]
+
     return {
-        "request_id": maintenance_request[
-            "request_id"
-        ],
-        "source_system": maintenance_request[
-            "source_system"
-        ],
-        "activity": maintenance_request[
-            "activity"
-        ],
-        "section": maintenance_request[
-            "section"
-        ],
-        "location": maintenance_request[
-            "location"
-        ],
-        "priority": maintenance_request[
-            "priority"
-        ],
-        "status": maintenance_request[
-            "status"
-        ],
+        "request_id": str(
+            maintenance_request["request_id"]
+        ),
+        "source_system": str(
+            maintenance_request["source_system"]
+        ),
+        "activity": str(
+            maintenance_request["activity"]
+        ),
+        "section": str(
+            maintenance_request["section"]
+        ),
+        "location": str(
+            maintenance_request["location"]
+        ),
+        "priority": str(
+            maintenance_request["priority"]
+        ),
+        "status": str(
+            maintenance_request["status"]
+        ),
         "due_date": str(
             maintenance_request["due_date"]
         ),
@@ -509,31 +602,35 @@ def build_fused_request(
         "required_manpower": int(
             maintenance_request["required_manpower"]
         ),
-        "required_machine": (
-            maintenance_request["required_machine"]
+        "required_machine": str(
+            required_machine
+            if not pd.isna(required_machine)
+            else ""
         ),
-        "required_materials": (
-            maintenance_request["required_materials"]
+        "required_materials": str(
+            required_materials
+            if not pd.isna(required_materials)
+            else ""
         ),
         "candidate_operational_windows": (
             operational_matches[
                 "window_id"
-            ].tolist()
+            ].astype(str).tolist()
         ),
         "feasible_operational_windows": (
             feasible_windows[
                 "window_id"
-            ].tolist()
+            ].astype(str).tolist()
         ),
         "matching_machines": (
             machine_matches[
                 "machine_id"
-            ].tolist()
+            ].astype(str).tolist()
         ),
         "available_machines": (
             available_machines[
                 "machine_id"
-            ].tolist()
+            ].astype(str).tolist()
         ),
         "available_manpower_count": int(
             len(available_manpower)
@@ -541,10 +638,13 @@ def build_fused_request(
         "matching_materials": (
             material_matches[
                 "material_name"
-            ].tolist()
+            ].astype(str).tolist()
         ),
         "material_warnings": sorted(
-            set(material_warnings)
+            set(
+                str(item)
+                for item in material_warnings
+            )
         ),
     }
 

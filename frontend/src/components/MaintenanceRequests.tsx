@@ -1,4 +1,4 @@
-import { useMemo, useState } from "react"
+import { useEffect, useMemo, useState } from "react"
 import type { PageKey } from "./OperationsOverview"
 import {
   AlertTriangle,
@@ -25,15 +25,29 @@ type MaintenanceRequestsProps = {
 }
 
 type Priority = "Critical" | "High" | "Medium" | "Low"
-type Status = "Pending" | "Under Review" | "Scheduled" | "Completed"
+
+type Status =
+  | "Pending"
+  | "Under Review"
+  | "Scheduled"
+  | "Completed"
+
+type Department = "TMS" | "SMMS" | "TDMS"
+
+type ShapExplanation = {
+  feature: string
+  contribution: number
+  direction?: string
+}
 
 type MaintenanceRequest = {
   id: string
   activity: string
-  department: "TMS" | "SMMS" | "TDMS"
+  department: Department
   location: string
   corridor: string
   priority: Priority
+  priorityScore: number
   status: Status
   submitted: string
   dueDate: string
@@ -44,143 +58,72 @@ type MaintenanceRequest = {
   machine: string
   materials: string[]
   aiReason: string
+  aiReasons: string[]
   recommendation: string
+  shapExplanations: ShapExplanation[]
 }
 
-const requests: MaintenanceRequest[] = [
-  {
-    id: "TMS-2408",
-    activity: "Rail Joint Replacement",
-    department: "TMS",
-    location: "Kharagpur–Jhargram, Km 126/4",
-    corridor: "Kharagpur–Jhargram",
-    priority: "Critical",
-    status: "Pending",
-    submitted: "Today, 08:42",
-    dueDate: "24 Sep 2026",
-    duration: "2 hr 30 min",
-    blockRequired: true,
-    operationalImpact:
-      "Defect is located on an active passenger corridor and requires a controlled maintenance window.",
-    manpower: 8,
-    machine: "Rail Cutting Machine",
-    materials: ["Rail joint set", "Fasteners", "Insulated liners"],
-    aiReason:
-      "High priority due to defect severity, traffic exposure and approaching maintenance deadline.",
-    recommendation:
-      "Coordinate with the signalling and traction teams and include this request in the next suitable block window.",
-  },
-  {
-    id: "SMMS-1832",
-    activity: "Signal Cable Inspection",
-    department: "SMMS",
-    location: "Andul Yard, Signal 42",
-    corridor: "Howrah–Kharagpur",
-    priority: "High",
-    status: "Under Review",
-    submitted: "Today, 07:55",
-    dueDate: "25 Sep 2026",
-    duration: "1 hr 30 min",
-    blockRequired: true,
-    operationalImpact:
-      "Inspection requires controlled access near a signal location used by scheduled movements.",
-    manpower: 5,
-    machine: "Test & Diagnostic Kit",
-    materials: ["Cable joints", "Insulation tape"],
-    aiReason:
-      "Elevated priority because the inspection affects signalling reliability on a busy section.",
-    recommendation:
-      "Check for a compatible block with nearby maintenance activities before scheduling separately.",
-  },
-  {
-    id: "TDMS-0917",
-    activity: "OHE Isolator Maintenance",
-    department: "TDMS",
-    location: "Panskura Station, OHE Mast 17",
-    corridor: "Howrah–Kharagpur",
-    priority: "High",
-    status: "Pending",
-    submitted: "Yesterday, 16:20",
-    dueDate: "26 Sep 2026",
-    duration: "2 hr",
-    blockRequired: true,
-    operationalImpact:
-      "Requires power isolation and coordinated access to the overhead equipment zone.",
-    manpower: 7,
-    machine: "Tower Wagon",
-    materials: ["Isolator kit", "Contact hardware"],
-    aiReason:
-      "Priority is driven by equipment condition, power isolation requirements and resource dependency.",
-    recommendation:
-      "Match with an existing OHE-compatible block and confirm tower wagon availability.",
-  },
-  {
-    id: "TMS-2394",
-    activity: "Track Geometry Verification",
-    department: "TMS",
-    location: "Kharagpur–Balasore, Km 188/2",
-    corridor: "Kharagpur–Balasore",
-    priority: "Medium",
-    status: "Pending",
-    submitted: "Yesterday, 13:10",
-    dueDate: "27 Sep 2026",
-    duration: "1 hr",
-    blockRequired: true,
-    operationalImpact:
-      "Verification can be completed during a planned maintenance window with limited operational disruption.",
-    manpower: 4,
-    machine: "Track Recording Trolley",
-    materials: ["Calibration kit"],
-    aiReason:
-      "Routine verification is due soon but does not currently indicate an immediate operational risk.",
-    recommendation:
-      "Combine with another TMS activity in the same corridor to improve block utilization.",
-  },
-  {
-    id: "SMMS-1819",
-    activity: "Point Machine Inspection",
-    department: "SMMS",
-    location: "Kharagpur Yard, Point 118",
-    corridor: "Kharagpur Yard",
-    priority: "Medium",
-    status: "Scheduled",
-    submitted: "22 Sep 2026",
-    dueDate: "28 Sep 2026",
-    duration: "1 hr 15 min",
-    blockRequired: true,
-    operationalImpact:
-      "Inspection can be performed within a planned yard maintenance window.",
-    manpower: 4,
-    machine: "Diagnostic Equipment",
-    materials: ["Lubricant", "Replacement contacts"],
-    aiReason:
-      "Scheduled maintenance with sufficient lead time and no current critical operational constraint.",
-    recommendation:
-      "Retain the planned slot and coordinate with other yard activities if resources overlap.",
-  },
-  {
-    id: "TDMS-0898",
-    activity: "OHE Registration Check",
-    department: "TDMS",
-    location: "Jhargram Station, Mast 62",
-    corridor: "Kharagpur–Jhargram",
-    priority: "Low",
-    status: "Pending",
-    submitted: "22 Sep 2026",
-    dueDate: "30 Sep 2026",
-    duration: "45 min",
-    blockRequired: false,
-    operationalImpact:
-      "Can be completed during an available maintenance opportunity without a dedicated block.",
-    manpower: 3,
-    machine: "Inspection Kit",
-    materials: ["Measuring gauge"],
-    aiReason:
-      "Low urgency with sufficient time remaining before the requested completion date.",
-    recommendation:
-      "Complete during an available access opportunity or combine with nearby OHE work.",
-  },
-]
+type MaintenanceApiResponse = {
+  status: string
+  total_requests: number
+  requests: MaintenanceApiRequest[]
+}
+
+type MaintenanceApiRequest = {
+  request_id: string
+  source_system: Department
+
+  activity: string
+  asset_type?: string
+  asset_id?: string
+
+  location: string
+  section: string
+
+  priority: Priority
+  priority_score?: number
+  priority_category?: Priority
+
+  status: string
+
+  reported_date: string
+  due_date: string
+
+  estimated_duration_hours: number
+
+  block_required: boolean
+
+  operational_impact: string
+
+  required_manpower: number
+  required_machine?: string | null
+  required_materials?: string[] | null
+
+  priority_reasons?: string[]
+  reasons?: string[]
+
+  shap_explanations?: Record<
+    string,
+    number | string
+  > | ShapExplanation[]
+
+  shap?: Record<
+    string,
+    number | string
+  > | ShapExplanation[]
+}
+
+type MaintenanceSummaryResponse = {
+  status: string
+  total_requests: number
+  critical_requests: number
+  high_requests: number
+  medium_requests: number
+  low_requests: number
+  top_priority_request: string
+}
+
+const API_BASE_URL = "http://127.0.0.1:8000"
 
 const priorityOrder: Record<Priority, number> = {
   Critical: 1,
@@ -192,16 +135,102 @@ const priorityOrder: Record<Priority, number> = {
 function MaintenanceRequests({
   onNavigate,
 }: MaintenanceRequestsProps) {
+  const [requests, setRequests] = useState<MaintenanceRequest[]>([])
   const [selectedRequest, setSelectedRequest] =
-    useState<MaintenanceRequest | null>(requests[0])
+    useState<MaintenanceRequest | null>(null)
+
+  const [summary, setSummary] =
+    useState<MaintenanceSummaryResponse | null>(null)
+
+  const [loading, setLoading] = useState(true)
+  const [error, setError] = useState("")
 
   const [search, setSearch] = useState("")
   const [departmentFilter, setDepartmentFilter] =
     useState("All Departments")
   const [priorityFilter, setPriorityFilter] =
     useState("All Priorities")
-  const [statusFilter, setStatusFilter] = useState("All Status")
+  const [statusFilter, setStatusFilter] =
+    useState("All Status")
   const [blockOnly, setBlockOnly] = useState(false)
+
+  useEffect(() => {
+    let cancelled = false
+
+    async function loadMaintenanceRequests() {
+      try {
+        setLoading(true)
+        setError("")
+
+        const [requestsResponse, summaryResponse] =
+          await Promise.all([
+            fetch(
+              `${API_BASE_URL}/api/maintenance/prioritized`,
+            ),
+            fetch(
+              `${API_BASE_URL}/api/maintenance/summary`,
+            ),
+          ])
+
+        if (!requestsResponse.ok) {
+          throw new Error(
+            `Maintenance API returned ${requestsResponse.status}`,
+          )
+        }
+
+        if (!summaryResponse.ok) {
+          throw new Error(
+            `Maintenance summary API returned ${summaryResponse.status}`,
+          )
+        }
+
+        const requestsData =
+          (await requestsResponse.json()) as MaintenanceApiResponse
+
+        const summaryData =
+          (await summaryResponse.json()) as MaintenanceSummaryResponse
+
+        if (cancelled) {
+          return
+        }
+
+        const normalizedRequests =
+          requestsData.requests.map(normalizeRequest)
+
+        setRequests(normalizedRequests)
+        setSummary(summaryData)
+
+        setSelectedRequest(
+          normalizedRequests.length > 0
+            ? normalizedRequests[0]
+            : null,
+        )
+      } catch (requestError) {
+        if (cancelled) {
+          return
+        }
+
+        console.error(
+          "Unable to load maintenance requests:",
+          requestError,
+        )
+
+        setError(
+          "Unable to load maintenance intelligence from the backend. Make sure the RailSync AI API is running.",
+        )
+      } finally {
+        if (!cancelled) {
+          setLoading(false)
+        }
+      }
+    }
+
+    loadMaintenanceRequests()
+
+    return () => {
+      cancelled = true
+    }
+  }, [])
 
   const filteredRequests = useMemo(() => {
     const query = search.trim().toLowerCase()
@@ -238,12 +267,18 @@ function MaintenanceRequests({
           matchesBlock
         )
       })
-      .sort(
-        (a, b) =>
+      .sort((a, b) => {
+        if (b.priorityScore !== a.priorityScore) {
+          return b.priorityScore - a.priorityScore
+        }
+
+        return (
           priorityOrder[a.priority] -
-          priorityOrder[b.priority],
-      )
+          priorityOrder[b.priority]
+        )
+      })
   }, [
+    requests,
     search,
     departmentFilter,
     priorityFilter,
@@ -258,6 +293,22 @@ function MaintenanceRequests({
     setStatusFilter("All Status")
     setBlockOnly(false)
   }
+
+  const criticalCount =
+    summary?.critical_requests ??
+    requests.filter(
+      (request) => request.priority === "Critical",
+    ).length
+
+  const highCount =
+    summary?.high_requests ??
+    requests.filter(
+      (request) => request.priority === "High",
+    ).length
+
+  const blockRequiredCount = requests.filter(
+    (request) => request.blockRequired,
+  ).length
 
   return (
     <div className="space-y-6">
@@ -288,18 +339,70 @@ function MaintenanceRequests({
         </button>
       </section>
 
+      {/* Loading state */}
+      {loading && (
+        <section className="rounded-xl border border-slate-200 bg-white px-5 py-4 shadow-sm">
+          <div className="flex items-center gap-3">
+            <div className="h-5 w-5 animate-spin rounded-full border-2 border-slate-200 border-t-[#1d5f8c]" />
+
+            <div>
+              <p className="text-sm font-semibold text-slate-800">
+                Loading maintenance intelligence...
+              </p>
+
+              <p className="mt-0.5 text-xs text-slate-500">
+                RailSync AI is retrieving prioritized maintenance
+                requests from the backend.
+              </p>
+            </div>
+          </div>
+        </section>
+      )}
+
+      {/* Error state */}
+      {!loading && error && (
+        <section className="rounded-xl border border-red-200 bg-red-50 px-5 py-4">
+          <div className="flex items-start gap-3">
+            <div className="mt-0.5 text-red-600">
+              <ShieldAlert size={18} />
+            </div>
+
+            <div>
+              <p className="text-sm font-bold text-red-800">
+                Maintenance intelligence unavailable
+              </p>
+
+              <p className="mt-1 text-sm leading-5 text-red-700">
+                {error}
+              </p>
+
+              <p className="mt-2 text-xs text-red-600">
+                Expected backend:
+                <span className="ml-1 font-mono">
+                  http://127.0.0.1:8000
+                </span>
+              </p>
+            </div>
+          </div>
+        </section>
+      )}
+
       {/* KPI cards */}
       <section className="grid grid-cols-2 gap-3 xl:grid-cols-4">
         <SummaryCard
           label="Total Requests"
-          value="18"
+          value={
+            loading
+              ? "—"
+              : String(summary?.total_requests ?? requests.length)
+          }
           detail="Across departments"
           icon={<ClipboardIcon />}
         />
 
         <SummaryCard
           label="Critical"
-          value="4"
+          value={loading ? "—" : String(criticalCount)}
           detail="Needs immediate review"
           icon={<ShieldAlert size={19} />}
           accent="critical"
@@ -307,7 +410,7 @@ function MaintenanceRequests({
 
         <SummaryCard
           label="High Priority"
-          value="6"
+          value={loading ? "—" : String(highCount)}
           detail="Requires planning action"
           icon={<AlertTriangle size={19} />}
           accent="warning"
@@ -315,7 +418,7 @@ function MaintenanceRequests({
 
         <SummaryCard
           label="Block Required"
-          value="11"
+          value={loading ? "—" : String(blockRequiredCount)}
           detail="Needs coordinated access"
           icon={<CalendarDays size={19} />}
           accent="blue"
@@ -335,7 +438,9 @@ function MaintenanceRequests({
 
               <input
                 value={search}
-                onChange={(event) => setSearch(event.target.value)}
+                onChange={(event) =>
+                  setSearch(event.target.value)
+                }
                 placeholder="Search request, activity, location..."
                 className="h-10 w-full rounded-lg border border-slate-200 bg-slate-50 pl-10 pr-3 text-sm text-slate-800 outline-none transition placeholder:text-slate-400 focus:border-[#1d5f8c] focus:bg-white focus:ring-2 focus:ring-[#1d5f8c]/10"
               />
@@ -378,7 +483,9 @@ function MaintenanceRequests({
               />
 
               <button
-                onClick={() => setBlockOnly((value) => !value)}
+                onClick={() =>
+                  setBlockOnly((value) => !value)
+                }
                 className={`inline-flex h-10 items-center gap-2 rounded-lg border px-3 text-sm font-medium transition ${
                   blockOnly
                     ? "border-[#1d5f8c] bg-[#eef6fb] text-[#1d5f8c]"
@@ -411,18 +518,25 @@ function MaintenanceRequests({
                 </h2>
 
                 <p className="mt-0.5 text-xs text-slate-500">
-                  {filteredRequests.length} request
-                  {filteredRequests.length !== 1 ? "s" : ""} shown
+                  {loading
+                    ? "Loading requests..."
+                    : `${filteredRequests.length} request${
+                        filteredRequests.length !== 1
+                          ? "s"
+                          : ""
+                      } shown`}
                 </p>
               </div>
 
               <div className="hidden items-center gap-2 text-xs text-slate-500 sm:flex">
                 <Filter size={14} />
-                Priority sorted
+                AI priority sorted
               </div>
             </div>
 
-            {filteredRequests.length === 0 ? (
+            {loading ? (
+              <LoadingRequestList />
+            ) : filteredRequests.length === 0 ? (
               <div className="flex min-h-[450px] flex-col items-center justify-center px-6 text-center">
                 <div className="mb-3 flex h-12 w-12 items-center justify-center rounded-full bg-slate-100 text-slate-400">
                   <Search size={21} />
@@ -450,8 +564,12 @@ function MaintenanceRequests({
                   <RequestRow
                     key={request.id}
                     request={request}
-                    selected={selectedRequest?.id === request.id}
-                    onClick={() => setSelectedRequest(request)}
+                    selected={
+                      selectedRequest?.id === request.id
+                    }
+                    onClick={() =>
+                      setSelectedRequest(request)
+                    }
                   />
                 ))}
               </div>
@@ -494,13 +612,241 @@ function MaintenanceRequests({
         />
 
         <span>
-          Prototype workspace using representative maintenance
-          requests. Live TMS, SMMS and TDMS integration will replace
-          this sample data in the connected system.
+          Synthetic datasets modeled on Indian Railway operational
+          scenarios. RailSync AI priority intelligence combines
+          operational conditions, maintenance urgency, resource
+          readiness and explainable ML signals.
         </span>
       </div>
     </div>
   )
+}
+
+function normalizeRequest(
+  request: MaintenanceApiRequest,
+): MaintenanceRequest {
+  const priority =
+    request.priority_category ??
+    request.priority ??
+    "Medium"
+
+  const status = normalizeStatus(request.status)
+
+  const durationHours =
+    Number(request.estimated_duration_hours) || 0
+
+  const reasons =
+    request.priority_reasons ??
+    request.reasons ??
+    []
+
+  const shapExplanations = normalizeShap(
+    request.shap_explanations ??
+      request.shap ??
+      {},
+  )
+
+  const corridor =
+    request.section?.trim() ||
+    request.location?.split(",")[0]?.trim() ||
+    "Operational Section"
+
+  const machine =
+    request.required_machine?.trim() ||
+    "Not specified"
+
+  const materials =
+    Array.isArray(request.required_materials)
+      ? request.required_materials.filter(
+          (material): material is string =>
+            typeof material === "string" &&
+            material.trim().length > 0,
+        )
+      : []
+
+  const priorityScore = Number(
+    request.priority_score ?? 0,
+  )
+
+  const aiReason =
+    reasons.length > 0
+      ? reasons.join(" ")
+      : buildDefaultReason(priority, request)
+
+  return {
+    id: request.request_id,
+    activity: request.activity,
+    department: request.source_system,
+    location: request.location,
+    corridor,
+    priority,
+    priorityScore,
+    status,
+    submitted: formatDate(request.reported_date),
+    dueDate: formatDate(request.due_date),
+    duration: formatDuration(durationHours),
+    blockRequired: Boolean(request.block_required),
+    operationalImpact:
+      request.operational_impact ||
+      "Operational impact information is not available.",
+    manpower: Number(request.required_manpower) || 0,
+    machine,
+    materials,
+    aiReason,
+    aiReasons: reasons,
+    recommendation: buildRecommendation(
+      request,
+      priority,
+    ),
+    shapExplanations,
+  }
+}
+
+function normalizeStatus(status: string): Status {
+  const normalized = status.trim().toLowerCase()
+
+  if (
+    normalized === "completed" ||
+    normalized === "complete"
+  ) {
+    return "Completed"
+  }
+
+  if (
+    normalized === "in progress" ||
+    normalized === "under review" ||
+    normalized === "review"
+  ) {
+    return "Under Review"
+  }
+
+  if (
+    normalized === "planned" ||
+    normalized === "scheduled"
+  ) {
+    return "Scheduled"
+  }
+
+  return "Pending"
+}
+
+function normalizeShap(
+  value:
+    | Record<string, number | string>
+    | ShapExplanation[],
+): ShapExplanation[] {
+  if (Array.isArray(value)) {
+    return value
+      .map((item) => ({
+        feature: String(item.feature ?? "Unknown"),
+        contribution:
+          Number(item.contribution) || 0,
+        direction: item.direction
+          ? String(item.direction)
+          : undefined,
+      }))
+      .sort(
+        (a, b) =>
+          Math.abs(b.contribution) -
+          Math.abs(a.contribution),
+      )
+  }
+
+  return Object.entries(value)
+    .map(([feature, contribution]) => {
+      const numericContribution =
+        Number(contribution) || 0
+
+      return {
+        feature,
+        contribution: numericContribution,
+        direction:
+          numericContribution >= 0
+            ? "increases"
+            : "decreases",
+      }
+    })
+    .sort(
+      (a, b) =>
+        Math.abs(b.contribution) -
+        Math.abs(a.contribution),
+    )
+}
+
+function formatDate(value: string) {
+  if (!value) {
+    return "Not specified"
+  }
+
+  const parsed = new Date(value)
+
+  if (Number.isNaN(parsed.getTime())) {
+    return value
+  }
+
+  return parsed.toLocaleDateString("en-GB", {
+    day: "2-digit",
+    month: "short",
+    year: "numeric",
+  })
+}
+
+function formatDuration(hours: number) {
+  if (hours <= 0) {
+    return "Not specified"
+  }
+
+  const wholeHours = Math.floor(hours)
+  const minutes = Math.round(
+    (hours - wholeHours) * 60,
+  )
+
+  if (wholeHours === 0) {
+    return `${minutes} min`
+  }
+
+  if (minutes === 0) {
+    return `${wholeHours} hr`
+  }
+
+  return `${wholeHours} hr ${minutes} min`
+}
+
+function buildDefaultReason(
+  priority: Priority,
+  request: MaintenanceApiRequest,
+) {
+  if (priority === "Critical") {
+    return "High operational priority requires immediate review and coordinated planning."
+  }
+
+  if (priority === "High") {
+    return "High priority requires near-term planning based on maintenance urgency and operational conditions."
+  }
+
+  if (request.block_required) {
+    return "Maintenance requires an operational block and should be considered during coordinated planning."
+  }
+
+  return "Maintenance request can be scheduled according to operational conditions and available resources."
+}
+
+function buildRecommendation(
+  request: MaintenanceApiRequest,
+  priority: Priority,
+) {
+  if (request.block_required) {
+    if (
+      priority === "Critical" ||
+      priority === "High"
+    ) {
+      return "Review this request for the next suitable block and coordinate required resources with other departments."
+    }
+
+    return "Combine this activity with compatible maintenance work where possible to improve block utilization."
+  }
+
+  return "Complete during a suitable access opportunity while maintaining required resource readiness."
 }
 
 function RequestRow({
@@ -545,7 +891,13 @@ function RequestRow({
                 department={request.department}
               />
 
-              <PriorityBadge priority={request.priority} />
+              <PriorityBadge
+                priority={request.priority}
+              />
+
+              <span className="rounded-full bg-slate-100 px-2 py-1 text-[10px] font-bold text-slate-500">
+                {request.priorityScore.toFixed(2)}
+              </span>
             </div>
 
             <h3 className="mt-1.5 truncate text-sm font-bold text-slate-900">
@@ -607,15 +959,26 @@ function RequestDetails({
                 {request.id}
               </span>
 
-              <DepartmentBadge department={request.department} />
+              <DepartmentBadge
+                department={request.department}
+              />
             </div>
 
             <h2 className="mt-2 text-lg font-bold leading-6 text-slate-900">
               {request.activity}
             </h2>
+
+            <p className="mt-1 text-xs text-slate-500">
+              AI priority score:{" "}
+              <span className="font-bold text-slate-700">
+                {request.priorityScore.toFixed(2)}
+              </span>
+            </p>
           </div>
 
-          <PriorityBadge priority={request.priority} />
+          <PriorityBadge
+            priority={request.priority}
+          />
         </div>
       </div>
 
@@ -679,7 +1042,11 @@ function RequestDetails({
             <ResourceLine
               icon={<PackageCheck size={15} />}
               label="Materials"
-              value={request.materials.join(", ")}
+              value={
+                request.materials.length > 0
+                  ? request.materials.join(", ")
+                  : "No specific material listed"
+              }
             />
           </div>
         </DetailSection>
@@ -697,15 +1064,126 @@ function RequestDetails({
               </h3>
 
               <p className="text-[11px] text-[#567187]">
-                Based on operational conditions
+                Explainable maintenance prioritization
               </p>
             </div>
+          </div>
+
+          <div className="mt-3 flex items-end gap-3">
+            <div>
+              <p className="text-2xl font-bold text-[#123b5d]">
+                {request.priorityScore.toFixed(2)}
+              </p>
+
+              <p className="text-[11px] text-slate-500">
+                Priority score / 100
+              </p>
+            </div>
+
+            <PriorityBadge
+              priority={request.priority}
+            />
           </div>
 
           <p className="mt-3 text-sm leading-6 text-slate-700">
             {request.aiReason}
           </p>
         </div>
+
+        {/* Priority reasons */}
+        {request.aiReasons.length > 0 && (
+          <DetailSection
+            title="Priority Factors"
+            icon={<ShieldAlert size={16} />}
+          >
+            <div className="space-y-2">
+              {request.aiReasons.map(
+                (reason, index) => (
+                  <div
+                    key={`${reason}-${index}`}
+                    className="flex items-start gap-2 rounded-lg border border-slate-200 bg-white px-3 py-2.5"
+                  >
+                    <span className="mt-1.5 h-1.5 w-1.5 shrink-0 rounded-full bg-[#1d5f8c]" />
+
+                    <p className="text-sm leading-5 text-slate-600">
+                      {reason}
+                    </p>
+                  </div>
+                ),
+              )}
+            </div>
+          </DetailSection>
+        )}
+
+        {/* SHAP explanation */}
+        {request.shapExplanations.length > 0 && (
+          <DetailSection
+            title="Explainable AI Signals"
+            icon={<Gauge size={16} />}
+          >
+            <div className="space-y-2">
+              {request.shapExplanations
+                .slice(0, 6)
+                .map((item) => {
+                  const positive =
+                    item.contribution >= 0
+
+                  return (
+                    <div
+                      key={item.feature}
+                      className="rounded-lg border border-slate-200 bg-white px-3 py-2.5"
+                    >
+                      <div className="flex items-center justify-between gap-3">
+                        <span className="min-w-0 truncate text-xs font-semibold text-slate-600">
+                          {formatFeatureName(
+                            item.feature,
+                          )}
+                        </span>
+
+                        <span
+                          className={`shrink-0 text-xs font-bold ${
+                            positive
+                              ? "text-emerald-600"
+                              : "text-red-600"
+                          }`}
+                        >
+                          {positive ? "+" : ""}
+                          {item.contribution.toFixed(4)}
+                        </span>
+                      </div>
+
+                      <div className="mt-1.5 h-1.5 overflow-hidden rounded-full bg-slate-100">
+                        <div
+                          className={`h-full rounded-full ${
+                            positive
+                              ? "bg-emerald-500"
+                              : "bg-red-400"
+                          }`}
+                          style={{
+                            width: `${Math.min(
+                              Math.max(
+                                Math.abs(
+                                  item.contribution,
+                                ) * 100,
+                                8,
+                              ),
+                              100,
+                            )}%`,
+                          }}
+                        />
+                      </div>
+
+                      <p className="mt-1 text-[10px] text-slate-400">
+                        {positive
+                          ? "Increases priority"
+                          : "Reduces priority"}
+                      </p>
+                    </div>
+                  )
+                })}
+            </div>
+          </DetailSection>
+        )}
 
         {/* Recommendation */}
         <DetailSection
@@ -720,7 +1198,9 @@ function RequestDetails({
         {/* Planning action */}
         <div className="border-t border-slate-200 pt-4">
           <button
-            onClick={() => onNavigate("Block Planning")}
+            onClick={() =>
+              onNavigate("Block Planning")
+            }
             className="flex h-11 w-full items-center justify-center gap-2 rounded-lg bg-[#123b5d] px-4 text-sm font-semibold text-white shadow-sm transition hover:bg-[#0d304b]"
           >
             Add to Block Planning
@@ -776,7 +1256,42 @@ function SummaryCard({
         </div>
       </div>
 
-      <p className="mt-2 text-xs text-slate-500">{detail}</p>
+      <p className="mt-2 text-xs text-slate-500">
+        {detail}
+      </p>
+    </div>
+  )
+}
+
+function LoadingRequestList() {
+  return (
+    <div className="divide-y divide-slate-100">
+      {Array.from({ length: 6 }).map(
+        (_, index) => (
+          <div
+            key={index}
+            className="animate-pulse px-4 py-4 sm:px-5"
+          >
+            <div className="flex gap-3">
+              <div className="mt-1 h-2.5 w-2.5 rounded-full bg-slate-200" />
+
+              <div className="flex-1">
+                <div className="flex gap-2">
+                  <div className="h-4 w-16 rounded bg-slate-200" />
+                  <div className="h-4 w-10 rounded bg-slate-200" />
+                  <div className="h-4 w-14 rounded bg-slate-200" />
+                </div>
+
+                <div className="mt-2 h-4 w-56 rounded bg-slate-200" />
+
+                <div className="mt-2 h-3 w-72 rounded bg-slate-100" />
+
+                <div className="mt-2 h-5 w-20 rounded-full bg-slate-100" />
+              </div>
+            </div>
+          </div>
+        ),
+      )}
     </div>
   )
 }
@@ -793,7 +1308,9 @@ function FilterSelect({
   return (
     <select
       value={value}
-      onChange={(event) => onChange(event.target.value)}
+      onChange={(event) =>
+        onChange(event.target.value)
+      }
       className="h-10 rounded-lg border border-slate-200 bg-white px-3 text-sm font-medium text-slate-600 outline-none transition focus:border-[#1d5f8c] focus:ring-2 focus:ring-[#1d5f8c]/10"
     >
       {options.map((option) => (
@@ -809,10 +1326,14 @@ function PriorityBadge({
   priority: Priority
 }) {
   const styles: Record<Priority, string> = {
-    Critical: "bg-red-50 text-red-700 border-red-100",
-    High: "bg-amber-50 text-amber-700 border-amber-100",
-    Medium: "bg-blue-50 text-blue-700 border-blue-100",
-    Low: "bg-slate-100 text-slate-600 border-slate-200",
+    Critical:
+      "bg-red-50 text-red-700 border-red-100",
+    High:
+      "bg-amber-50 text-amber-700 border-amber-100",
+    Medium:
+      "bg-blue-50 text-blue-700 border-blue-100",
+    Low:
+      "bg-slate-100 text-slate-600 border-slate-200",
   }
 
   return (
@@ -830,10 +1351,14 @@ function StatusBadge({
   status: Status
 }) {
   const styles: Record<Status, string> = {
-    Pending: "bg-amber-50 text-amber-700",
-    "Under Review": "bg-blue-50 text-blue-700",
-    Scheduled: "bg-emerald-50 text-emerald-700",
-    Completed: "bg-slate-100 text-slate-600",
+    Pending:
+      "bg-amber-50 text-amber-700",
+    "Under Review":
+      "bg-blue-50 text-blue-700",
+    Scheduled:
+      "bg-emerald-50 text-emerald-700",
+    Completed:
+      "bg-slate-100 text-slate-600",
   }
 
   return (
@@ -848,7 +1373,7 @@ function StatusBadge({
 function DepartmentBadge({
   department,
 }: {
-  department: "TMS" | "SMMS" | "TDMS"
+  department: Department
 }) {
   return (
     <span className="rounded-full bg-slate-100 px-2 py-1 text-[10px] font-bold tracking-wide text-slate-600">
@@ -869,7 +1394,10 @@ function DetailSection({
   return (
     <section>
       <div className="mb-2.5 flex items-center gap-2 text-xs font-bold uppercase tracking-wide text-slate-700">
-        <span className="text-[#1d5f8c]">{icon}</span>
+        <span className="text-[#1d5f8c]">
+          {icon}
+        </span>
+
         {title}
       </div>
 
@@ -918,7 +1446,9 @@ function ResourceLine({
 }) {
   return (
     <div className="flex items-start gap-3 rounded-lg border border-slate-200 bg-white px-3 py-2.5">
-      <span className="mt-0.5 text-[#1d5f8c]">{icon}</span>
+      <span className="mt-0.5 text-[#1d5f8c]">
+        {icon}
+      </span>
 
       <div className="min-w-0">
         <p className="text-[11px] font-semibold uppercase tracking-wide text-slate-400">
@@ -931,6 +1461,14 @@ function ResourceLine({
       </div>
     </div>
   )
+}
+
+function formatFeatureName(feature: string) {
+  return feature
+    .replaceAll("_", " ")
+    .replace(/\b\w/g, (letter) =>
+      letter.toUpperCase(),
+    )
 }
 
 function ClipboardIcon() {
@@ -950,7 +1488,14 @@ function ClipboardIconSvg() {
       strokeLinejoin="round"
       aria-hidden="true"
     >
-      <rect width="16" height="18" x="4" y="3" rx="2" />
+      <rect
+        width="16"
+        height="18"
+        x="4"
+        y="3"
+        rx="2"
+      />
+
       <path d="M9 3V1h6v2" />
       <path d="M8 8h8" />
       <path d="M8 12h8" />

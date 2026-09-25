@@ -1,906 +1,1630 @@
-import { useMemo, useState } from "react"
-import type { PageKey } from "./OperationsOverview"
-import {
-  AlertTriangle,
-  ArrowRight,
-  CalendarDays,
-  CheckCircle2,
-  ChevronRight,
-  Clock3,
-  FileCheck2,
-  Gauge,
-  MapPin,
-  PackageCheck,
-  Plus,
-  Route,
-  ShieldCheck,
-  TrainFront,
-  Users,
-  Wrench,
-  Zap,
-} from "lucide-react"
+import { useEffect, useState } from "react"
 
-type BlockPlanningProps = {
-  onNavigate: (page: PageKey) => void
-}
-
-type PlanningStatus =
-  | "Ready"
-  | "Needs Resources"
-  | "Conflict"
-  | "Scheduled"
+const API = "http://127.0.0.1:8000"
 
 type Opportunity = {
-  id: string
-  title: string
-  corridor: string
-  location: string
-  date: string
-  start: string
-  end: string
-  duration: string
-  requests: number
+  opportunity_id: string
+  request_ids: string[]
+  activities: string[]
   departments: string[]
-  status: PlanningStatus
-  trainImpact: string
-  manpower: string
-  machine: string
-  confidence: number
-  reason: string
+  section: string
+  date: string
+  window_id: string
+  window_type: string
+  available_hours: number
+  combined_duration_hours: number
+  utilization_percent: number
+  opportunity_score: number
+  compatibility_reasons: string[]
+  resource_saving_percent: number
+  traffic_level: string
+  block_feasible: boolean
 }
 
-const opportunities: Opportunity[] = [
-  {
-    id: "BLK-260924-01",
-    title: "Kharagpur–Jhargram Maintenance Window",
-    corridor: "Kharagpur–Jhargram",
-    location: "Km 126/4 – Km 129/8",
-    date: "24 Sep 2026",
-    start: "10:30",
-    end: "13:00",
-    duration: "2 hr 30 min",
-    requests: 3,
-    departments: ["TMS", "TDMS"],
-    status: "Ready",
-    trainImpact: "2 freight movements can be rescheduled",
-    manpower: "15 staff available",
-    machine: "Rail Cutting Machine + Tower Wagon",
-    confidence: 94,
-    reason:
-      "Combines a critical rail joint replacement with nearby OHE maintenance while maintaining an acceptable traffic window.",
-  },
-  {
-    id: "BLK-260925-02",
-    title: "Andul Signalling Maintenance Window",
-    corridor: "Howrah–Kharagpur",
-    location: "Andul Yard – Signal 42",
-    date: "25 Sep 2026",
-    start: "01:00",
-    end: "02:30",
-    duration: "1 hr 30 min",
-    requests: 2,
-    departments: ["SMMS"],
-    status: "Needs Resources",
-    trainImpact: "1 passenger movement requires coordination",
-    manpower: "5 of 6 staff available",
-    machine: "Diagnostic Kit available",
-    confidence: 87,
-    reason:
-      "Suitable timing identified, but one signalling resource is currently unavailable for the complete activity.",
-  },
-  {
-    id: "BLK-260926-03",
-    title: "Panskura OHE Maintenance Window",
-    corridor: "Howrah–Kharagpur",
-    location: "Panskura Station – Mast 17",
-    date: "26 Sep 2026",
-    start: "11:00",
-    end: "13:00",
-    duration: "2 hr",
-    requests: 2,
-    departments: ["TDMS"],
-    status: "Ready",
-    trainImpact: "Power isolation required",
-    manpower: "7 staff available",
-    machine: "Tower Wagon available",
-    confidence: 91,
-    reason:
-      "Resource availability and power isolation window align with the requested OHE maintenance duration.",
-  },
-  {
-    id: "BLK-260927-04",
-    title: "Kharagpur Yard Joint Window",
-    corridor: "Kharagpur Yard",
-    location: "Point 118 – Yard Section C",
-    date: "27 Sep 2026",
-    start: "14:00",
-    end: "15:15",
-    duration: "1 hr 15 min",
-    requests: 2,
-    departments: ["SMMS", "TMS"],
-    status: "Conflict",
-    trainImpact: "Yard movement conflict detected",
-    manpower: "9 staff available",
-    machine: "Diagnostic Equipment available",
-    confidence: 72,
-    reason:
-      "Potential joint opportunity exists, but the current yard movement plan creates a timing conflict.",
-  },
-]
+type Conflict = {
+  opportunity_id: string
+  request_ids: string[]
+  section: string
+  date: string
+  window_id: string
+  status: string
+  severity: string
+  can_proceed: boolean
+  traffic_level: string
+  passenger_train_count: number
+  goods_train_count: number
+  block_allowed: boolean
+  available_hours: number
+  required_hours: number
+  utilization_percent: number
+  total_train_activity: number
+  conflict_reasons: string[]
+  recommendation: string
+}
 
-function BlockPlanning({
-  onNavigate,
-}: BlockPlanningProps) {
-  const [selectedOpportunity, setSelectedOpportunity] =
-    useState<Opportunity>(opportunities[0])
+type OptimizedItem = {
+  opportunity_id: string
+  request_ids: string[]
+  section: string
+  date: string
+  window_id: string
+  window_type: string
+  duration_hours: number
+  available_hours: number
+  utilization_percent: number
+  opportunity_score: number
+  conflict_status: string
+}
 
-  const [planningDate, setPlanningDate] =
-    useState("24 Sep 2026")
+type Approval = {
+  approval_id: string
+  status: string
+  reviewer: string
+  submitted_at: string | null
+  reviewed_at: string | null
+  remarks: string
+  plan_status: string
+  solver_status: string
+  summary: {
+    candidate_count: number
+    selected_count: number
+    unscheduled_count: number
+    total_planned_hours: number
+    total_opportunity_score: number
+  }
+  selected_opportunities: OptimizedItem[]
+}
 
-  const [showOnlyReady, setShowOnlyReady] =
-    useState(false)
+type HandoffItem = {
+  opportunity_id: string
+  request_ids: string[]
+  section: string
+  date: string
+  window_id: string
+  window_type: string
+  planned_duration_hours: number
+  available_window_hours: number
+  utilization_percent: number
+  opportunity_score: number
+  conflict_status: string
+  handoff_status: string
+}
 
-  const filteredOpportunities = useMemo(() => {
-    if (!showOnlyReady) {
-      return opportunities
-    }
+type Handoff = {
+  status: string
+  handoff_id: string
+  generated_at: string
+  source: {
+    approval_id: string
+    approval_status: string
+    reviewer: string
+    reviewed_at: string | null
+  }
+  plan: {
+    solver_status: string
+    selected_blocks: number
+    planned_work_hours: number
+    opportunity_value: number
+  }
+  handoff_items: HandoffItem[]
+  destination: string
+  integration_status: string
+}
 
-    return opportunities.filter(
-      (item) => item.status === "Ready",
-    )
-  }, [showOnlyReady])
+function num(value: unknown): number {
+  const n = Number(value)
+  return Number.isFinite(n) ? n : 0
+}
 
-  return (
-    <div className="space-y-6">
-      {/* Header */}
-      <section className="flex flex-col gap-4 xl:flex-row xl:items-end xl:justify-between">
-        <div>
-          <div className="mb-2 flex items-center gap-2 text-xs font-semibold uppercase tracking-[0.12em] text-slate-500">
-            <CalendarDays size={15} />
-            Planning Workspace
-          </div>
+function text(
+  value: unknown,
+  fallback = "—",
+): string {
+  return typeof value === "string" && value
+    ? value
+    : fallback
+}
 
-          <h1 className="text-2xl font-bold tracking-tight text-slate-900 sm:text-3xl">
-            Block Planning
-          </h1>
+function list(value: unknown): string[] {
+  return Array.isArray(value)
+    ? value.filter(
+        (item): item is string =>
+          typeof item === "string",
+      )
+    : []
+}
 
-          <p className="mt-2 max-w-3xl text-sm leading-6 text-slate-600">
-            Coordinate maintenance requirements, train operations and
-            available resources into practical block windows.
-          </p>
-        </div>
+function dateText(value: string): string {
+  if (!value) return "—"
 
-        <div className="flex flex-wrap gap-2">
-          <button
-            onClick={() =>
-              onNavigate("Maintenance Requests")
-            }
-            className="inline-flex h-10 items-center justify-center gap-2 rounded-lg border border-slate-200 bg-white px-4 text-sm font-semibold text-slate-700 shadow-sm transition hover:bg-slate-50"
-          >
-            <Wrench size={16} />
-            Maintenance Requests
-          </button>
+  const date = new Date(`${value}T00:00:00`)
 
-          <button
-            onClick={() =>
-              onNavigate("Resource Readiness")
-            }
-            className="inline-flex h-10 items-center justify-center gap-2 rounded-lg bg-[#123b5d] px-4 text-sm font-semibold text-white shadow-sm transition hover:bg-[#0d304b]"
-          >
-            <PackageCheck size={16} />
-            Resource Readiness
-          </button>
-        </div>
-      </section>
+  if (Number.isNaN(date.getTime())) {
+    return value
+  }
 
-      {/* Planning controls */}
-      <section className="rounded-xl border border-slate-200 bg-white p-4 shadow-sm">
-        <div className="flex flex-col gap-4 lg:flex-row lg:items-center lg:justify-between">
-          <div>
-            <p className="text-xs font-semibold uppercase tracking-wide text-slate-400">
-              Planning horizon
-            </p>
+  return date.toLocaleDateString("en-IN", {
+    day: "2-digit",
+    month: "short",
+    year: "numeric",
+  })
+}
 
-            <div className="mt-1 flex items-center gap-3">
-              <h2 className="text-lg font-bold text-slate-900">
-                Weekly Block Planning
-              </h2>
+function dateTimeText(
+  value: string | null,
+): string {
+  if (!value) return "—"
 
-              <span className="rounded-full bg-[#eef6fb] px-2.5 py-1 text-xs font-semibold text-[#1d5f8c]">
-                23–29 Sep 2026
-              </span>
-            </div>
-          </div>
+  const date = new Date(value)
 
-          <div className="flex flex-wrap items-center gap-2">
-            <label className="text-xs font-semibold text-slate-500">
-              Focus date
-            </label>
+  if (Number.isNaN(date.getTime())) {
+    return value
+  }
 
-            <select
-              value={planningDate}
-              onChange={(event) =>
-                setPlanningDate(event.target.value)
-              }
-              className="h-10 rounded-lg border border-slate-200 bg-white px-3 text-sm font-medium text-slate-700 outline-none focus:border-[#1d5f8c] focus:ring-2 focus:ring-[#1d5f8c]/10"
-            >
-              <option>24 Sep 2026</option>
-              <option>25 Sep 2026</option>
-              <option>26 Sep 2026</option>
-              <option>27 Sep 2026</option>
-              <option>28 Sep 2026</option>
-              <option>29 Sep 2026</option>
-            </select>
+  return date.toLocaleString("en-IN", {
+    day: "2-digit",
+    month: "short",
+    year: "numeric",
+    hour: "2-digit",
+    minute: "2-digit",
+  })
+}
 
-            <button
-              onClick={() =>
-                setShowOnlyReady((value) => !value)
-              }
-              className={`inline-flex h-10 items-center gap-2 rounded-lg border px-3 text-sm font-semibold transition ${
-                showOnlyReady
-                  ? "border-emerald-200 bg-emerald-50 text-emerald-700"
-                  : "border-slate-200 bg-white text-slate-600 hover:bg-slate-50"
-              }`}
-            >
-              <ShieldCheck size={15} />
-              Ready only
-            </button>
-          </div>
-        </div>
-      </section>
-
-      {/* Planning KPIs */}
-      <section className="grid grid-cols-2 gap-3 xl:grid-cols-4">
-        <PlanningKpi
-          label="Requests in Plan"
-          value="11"
-          detail="Across 6 corridors"
-          icon={<Wrench size={18} />}
-        />
-
-        <PlanningKpi
-          label="Joint Opportunities"
-          value="4"
-          detail="Potential combined windows"
-          icon={<Zap size={18} />}
-          accent="blue"
-        />
-
-        <PlanningKpi
-          label="Ready to Schedule"
-          value="7"
-          detail="Resources aligned"
-          icon={<CheckCircle2 size={18} />}
-          accent="green"
-        />
-
-        <PlanningKpi
-          label="Conflicts"
-          value="2"
-          detail="Need planner review"
-          icon={<AlertTriangle size={18} />}
-          accent="amber"
-        />
-      </section>
-
-      {/* Main planner */}
-      <section className="overflow-hidden rounded-xl border border-slate-200 bg-white shadow-sm">
-        <div className="grid min-h-[650px] xl:grid-cols-[minmax(0,1fr)_420px]">
-          {/* Opportunities */}
-          <div className="min-w-0">
-            <div className="border-b border-slate-200 px-5 py-4">
-              <div className="flex items-center justify-between gap-3">
-                <div>
-                  <h2 className="text-sm font-bold text-slate-900">
-                    Recommended Planning Opportunities
-                  </h2>
-
-                  <p className="mt-1 text-xs text-slate-500">
-                    RailSync identifies windows where requests,
-                    resources and operations align.
-                  </p>
-                </div>
-
-                <span className="hidden rounded-full bg-slate-100 px-2.5 py-1 text-xs font-semibold text-slate-500 sm:inline-flex">
-                  {filteredOpportunities.length} opportunities
-                </span>
-              </div>
-            </div>
-
-            <div className="divide-y divide-slate-100">
-              {filteredOpportunities.map((opportunity) => (
-                <OpportunityRow
-                  key={opportunity.id}
-                  opportunity={opportunity}
-                  selected={
-                    selectedOpportunity.id === opportunity.id
-                  }
-                  onClick={() =>
-                    setSelectedOpportunity(opportunity)
-                  }
-                />
-              ))}
-            </div>
-
-            <div className="border-t border-slate-200 bg-slate-50 px-5 py-4">
-              <button className="inline-flex items-center gap-2 text-sm font-semibold text-[#1d5f8c] hover:underline">
-                <Plus size={16} />
-                Add manual planning window
-              </button>
-            </div>
-          </div>
-
-          {/* Selected opportunity */}
-          <OpportunityDetails
-            opportunity={selectedOpportunity}
-            onNavigate={onNavigate}
-          />
-        </div>
-      </section>
-
-      {/* Planning flow */}
-      <section>
-        <div className="mb-3 flex items-center justify-between">
-          <div>
-            <h2 className="text-base font-bold text-slate-900">
-              Block Planning Workflow
-            </h2>
-
-            <p className="mt-1 text-xs text-slate-500">
-              From maintenance request to approved operational plan.
-            </p>
-          </div>
-        </div>
-
-        <div className="grid gap-3 md:grid-cols-5">
-          <WorkflowStep
-            number="01"
-            title="Requests"
-            description="Collect maintenance needs"
-            active
-          />
-
-          <WorkflowConnector />
-
-          <WorkflowStep
-            number="02"
-            title="Opportunities"
-            description="Find compatible windows"
-            active
-          />
-
-          <WorkflowConnector />
-
-          <WorkflowStep
-            number="03"
-            title="Conflicts"
-            description="Check traffic constraints"
-            active
-          />
-
-          <WorkflowConnector />
-
-          <WorkflowStep
-            number="04"
-            title="Optimization"
-            description="Build suitable plan"
-            active
-          />
-
-          <WorkflowConnector />
-
-          <WorkflowStep
-            number="05"
-            title="Approval"
-            description="Human review & BDMS"
-          />
-        </div>
-      </section>
-
-      {/* Prototype note */}
-      <div className="flex items-start gap-3 rounded-lg border border-slate-200 bg-white px-4 py-3 text-xs leading-5 text-slate-500">
-        <Gauge
-          size={16}
-          className="mt-0.5 shrink-0 text-[#1d5f8c]"
-        />
-
-        <span>
-          Planning recommendations shown here use representative
-          prototype data. In the connected system, RailSync AI will
-          evaluate live operational, maintenance and resource data.
-        </span>
-      </div>
-    </div>
+async function getJson<T>(
+  endpoint: string,
+): Promise<T> {
+  const response = await fetch(
+    `${API}${endpoint}`,
   )
+
+  const data = await response.json()
+
+  if (!response.ok) {
+    const message =
+      typeof data?.detail === "string"
+        ? data.detail
+        : "Request failed."
+
+    throw new Error(message)
+  }
+
+  return data as T
 }
 
-function OpportunityRow({
-  opportunity,
-  selected,
-  onClick,
-}: {
-  opportunity: Opportunity
-  selected: boolean
-  onClick: () => void
-}) {
-  return (
-    <button
-      onClick={onClick}
-      className={`group block w-full text-left transition ${
-        selected
-          ? "bg-[#f2f7fa]"
-          : "bg-white hover:bg-slate-50"
-      }`}
-    >
-      <div className="flex gap-4 px-5 py-4">
-        <div
-          className={`mt-1 flex h-9 w-9 shrink-0 items-center justify-center rounded-lg ${
-            selected
-              ? "bg-[#dcecf5] text-[#1d5f8c]"
-              : "bg-slate-100 text-slate-500"
-          }`}
-        >
-          <Route size={17} />
-        </div>
-
-        <div className="min-w-0 flex-1">
-          <div className="flex flex-wrap items-center gap-2">
-            <span className="text-[11px] font-bold tracking-wide text-slate-400">
-              {opportunity.id}
-            </span>
-
-            <PlanningStatus status={opportunity.status} />
-          </div>
-
-          <h3 className="mt-1 text-sm font-bold text-slate-900">
-            {opportunity.title}
-          </h3>
-
-          <div className="mt-1.5 flex flex-wrap gap-x-4 gap-y-1 text-xs text-slate-500">
-            <span className="inline-flex items-center gap-1">
-              <CalendarDays size={13} />
-              {opportunity.date}
-            </span>
-
-            <span className="inline-flex items-center gap-1">
-              <Clock3 size={13} />
-              {opportunity.start}–{opportunity.end}
-            </span>
-
-            <span className="inline-flex items-center gap-1">
-              <Wrench size={13} />
-              {opportunity.requests} requests
-            </span>
-          </div>
-
-          <div className="mt-2 flex flex-wrap items-center gap-2">
-            {opportunity.departments.map((department) => (
-              <span
-                key={department}
-                className="rounded-full bg-slate-100 px-2 py-1 text-[10px] font-bold tracking-wide text-slate-600"
-              >
-                {department}
-              </span>
-            ))}
-
-            <span className="text-[11px] text-slate-400">
-              {opportunity.location}
-            </span>
-          </div>
-        </div>
-
-        <ChevronRight
-          size={18}
-          className={`mt-3 shrink-0 ${
-            selected
-              ? "text-[#1d5f8c]"
-              : "text-slate-300 group-hover:text-slate-500"
-          }`}
-        />
-      </div>
-    </button>
-  )
+function statusStyle(
+  severity: string,
+): string {
+  switch (severity.toLowerCase()) {
+    case "critical":
+      return "border-red-200 bg-red-50 text-red-700"
+    case "high":
+      return "border-orange-200 bg-orange-50 text-orange-700"
+    case "medium":
+      return "border-amber-200 bg-amber-50 text-amber-700"
+    default:
+      return "border-emerald-200 bg-emerald-50 text-emerald-700"
+  }
 }
 
-function OpportunityDetails({
-  opportunity,
-  onNavigate,
-}: {
-  opportunity: Opportunity
-  onNavigate: (page: PageKey) => void
-}) {
-  return (
-    <div className="border-t border-slate-200 bg-slate-50 xl:border-l xl:border-t-0">
-      <div className="border-b border-slate-200 bg-white px-5 py-4">
-        <div className="flex items-start justify-between gap-3">
-          <div>
-            <span className="text-[11px] font-bold tracking-wide text-slate-400">
-              {opportunity.id}
-            </span>
-
-            <h2 className="mt-1.5 text-lg font-bold leading-6 text-slate-900">
-              {opportunity.title}
-            </h2>
-          </div>
-
-          <PlanningStatus status={opportunity.status} />
-        </div>
-      </div>
-
-      <div className="space-y-5 p-5">
-        {/* Window */}
-        <section>
-          <SectionTitle
-            icon={<CalendarDays size={15} />}
-            title="Proposed Block Window"
-          />
-
-          <div className="rounded-xl border border-[#cfe1ed] bg-[#f1f7fa] p-4">
-            <div className="flex items-center gap-3">
-              <div className="flex h-10 w-10 items-center justify-center rounded-lg bg-[#dcecf5] text-[#1d5f8c]">
-                <Clock3 size={19} />
-              </div>
-
-              <div>
-                <p className="text-xs font-semibold text-[#567187]">
-                  {opportunity.date}
-                </p>
-
-                <p className="mt-0.5 text-lg font-bold text-[#123b5d]">
-                  {opportunity.start} – {opportunity.end}
-                </p>
-              </div>
-            </div>
-
-            <div className="mt-3 border-t border-[#d7e7f0] pt-3 text-xs text-[#567187]">
-              Duration:{" "}
-              <strong className="text-[#123b5d]">
-                {opportunity.duration}
-              </strong>
-            </div>
-          </div>
-        </section>
-
-        {/* Location */}
-        <section>
-          <SectionTitle
-            icon={<MapPin size={15} />}
-            title="Location & Corridor"
-          />
-
-          <div className="rounded-lg border border-slate-200 bg-white p-3">
-            <p className="text-sm font-semibold text-slate-800">
-              {opportunity.location}
-            </p>
-
-            <p className="mt-1 text-xs text-slate-500">
-              {opportunity.corridor}
-            </p>
-          </div>
-        </section>
-
-        {/* Requests */}
-        <section>
-          <SectionTitle
-            icon={<Wrench size={15} />}
-            title="Combined Work"
-          />
-
-          <div className="grid grid-cols-2 gap-3">
-            <MiniMetric
-              label="Requests"
-              value={`${opportunity.requests}`}
-              icon={<Wrench size={14} />}
-            />
-
-            <MiniMetric
-              label="Teams"
-              value={opportunity.departments.join(" + ")}
-              icon={<Users size={14} />}
-            />
-          </div>
-        </section>
-
-        {/* Resources */}
-        <section>
-          <SectionTitle
-            icon={<PackageCheck size={15} />}
-            title="Resource Readiness"
-          />
-
-          <div className="space-y-2">
-            <ResourceCheck
-              label="Manpower"
-              value={opportunity.manpower}
-              ready={opportunity.status !== "Needs Resources"}
-            />
-
-            <ResourceCheck
-              label="Machine"
-              value={opportunity.machine}
-              ready={opportunity.status !== "Needs Resources"}
-            />
-          </div>
-        </section>
-
-        {/* Traffic */}
-        <section>
-          <SectionTitle
-            icon={<TrainFront size={15} />}
-            title="Traffic Impact"
-          />
-
-          <div className="rounded-lg border border-slate-200 bg-white p-3">
-            <p className="text-sm leading-5 text-slate-600">
-              {opportunity.trainImpact}
-            </p>
-          </div>
-        </section>
-
-        {/* AI insight */}
-        <div className="rounded-xl border border-[#cfe1ed] bg-[#f1f7fa] p-4">
-          <div className="flex items-center justify-between gap-3">
-            <div className="flex items-center gap-2">
-              <Gauge
-                size={16}
-                className="text-[#1d5f8c]"
-              />
-
-              <span className="text-sm font-bold text-[#123b5d]">
-                RailSync AI Match
-              </span>
-            </div>
-
-            <span className="text-sm font-bold text-[#1d5f8c]">
-              {opportunity.confidence}%
-            </span>
-          </div>
-
-          <div className="mt-2 h-1.5 overflow-hidden rounded-full bg-[#dce8ee]">
-            <div
-              className="h-full rounded-full bg-[#1d5f8c]"
-              style={{
-                width: `${opportunity.confidence}%`,
-              }}
-            />
-          </div>
-
-          <p className="mt-3 text-sm leading-6 text-slate-700">
-            {opportunity.reason}
-          </p>
-        </div>
-
-        {/* Actions */}
-        <div className="border-t border-slate-200 pt-4">
-          {opportunity.status === "Conflict" ? (
-            <button className="flex h-11 w-full items-center justify-center gap-2 rounded-lg border border-amber-200 bg-amber-50 px-4 text-sm font-semibold text-amber-700 transition hover:bg-amber-100">
-              <AlertTriangle size={16} />
-              Review Conflict
-            </button>
-          ) : opportunity.status === "Needs Resources" ? (
-            <button
-              onClick={() =>
-                onNavigate("Resource Readiness")
-              }
-              className="flex h-11 w-full items-center justify-center gap-2 rounded-lg bg-[#123b5d] px-4 text-sm font-semibold text-white shadow-sm transition hover:bg-[#0d304b]"
-            >
-              <PackageCheck size={16} />
-              Check Resource Readiness
-            </button>
-          ) : (
-            <button className="flex h-11 w-full items-center justify-center gap-2 rounded-lg bg-[#123b5d] px-4 text-sm font-semibold text-white shadow-sm transition hover:bg-[#0d304b]">
-              <FileCheck2 size={16} />
-              Add to Proposed Plan
-            </button>
-          )}
-
-          <p className="mt-2 text-center text-[11px] leading-4 text-slate-400">
-            Final block plan remains subject to human approval.
-          </p>
-        </div>
-      </div>
-    </div>
-  )
-}
-
-function PlanningKpi({
+function Info({
   label,
   value,
-  detail,
-  icon,
-  accent = "default",
 }: {
   label: string
   value: string
-  detail: string
-  icon: React.ReactNode
-  accent?: "default" | "blue" | "green" | "amber"
-}) {
-  const iconStyle = {
-    default: "bg-slate-100 text-slate-600",
-    blue: "bg-[#eef6fb] text-[#1d5f8c]",
-    green: "bg-emerald-50 text-emerald-600",
-    amber: "bg-amber-50 text-amber-600",
-  }
-
-  return (
-    <div className="rounded-xl border border-slate-200 bg-white p-4 shadow-sm">
-      <div className="flex items-start justify-between">
-        <div>
-          <p className="text-xs font-semibold text-slate-500">
-            {label}
-          </p>
-
-          <p className="mt-1 text-2xl font-bold tracking-tight text-slate-900">
-            {value}
-          </p>
-        </div>
-
-        <div
-          className={`flex h-9 w-9 items-center justify-center rounded-lg ${iconStyle[accent]}`}
-        >
-          {icon}
-        </div>
-      </div>
-
-      <p className="mt-2 text-xs text-slate-500">
-        {detail}
-      </p>
-    </div>
-  )
-}
-
-function PlanningStatus({
-  status,
-}: {
-  status: PlanningStatus
-}) {
-  const styles: Record<PlanningStatus, string> = {
-    Ready: "bg-emerald-50 text-emerald-700",
-    "Needs Resources": "bg-amber-50 text-amber-700",
-    Conflict: "bg-red-50 text-red-700",
-    Scheduled: "bg-blue-50 text-blue-700",
-  }
-
-  return (
-    <span
-      className={`rounded-full px-2 py-1 text-[10px] font-bold ${styles[status]}`}
-    >
-      {status}
-    </span>
-  )
-}
-
-function SectionTitle({
-  icon,
-  title,
-}: {
-  icon: React.ReactNode
-  title: string
 }) {
   return (
-    <div className="mb-2.5 flex items-center gap-2 text-xs font-bold uppercase tracking-wide text-slate-700">
-      <span className="text-[#1d5f8c]">{icon}</span>
-      {title}
-    </div>
-  )
-}
-
-function MiniMetric({
-  label,
-  value,
-  icon,
-}: {
-  label: string
-  value: string
-  icon: React.ReactNode
-}) {
-  return (
-    <div className="rounded-lg border border-slate-200 bg-white p-3">
-      <div className="flex items-center gap-1.5 text-[11px] font-semibold uppercase tracking-wide text-slate-400">
-        {icon}
+    <div className="rounded-xl border border-slate-200 bg-slate-50 p-3">
+      <div className="text-[11px] font-bold uppercase tracking-wide text-slate-500">
         {label}
       </div>
 
-      <p className="mt-1.5 text-sm font-bold text-slate-800">
+      <div className="mt-1 text-sm font-bold text-slate-800">
         {value}
-      </p>
+      </div>
     </div>
   )
 }
 
-function ResourceCheck({
+function Metric({
   label,
   value,
-  ready,
+  description,
 }: {
   label: string
   value: string
-  ready: boolean
+  description: string
 }) {
   return (
-    <div className="flex items-center justify-between gap-3 rounded-lg border border-slate-200 bg-white px-3 py-2.5">
-      <div>
-        <p className="text-[11px] font-semibold uppercase tracking-wide text-slate-400">
-          {label}
-        </p>
-
-        <p className="mt-0.5 text-sm font-medium text-slate-700">
-          {value}
-        </p>
+    <div className="rounded-xl border border-slate-200 bg-slate-50 p-4">
+      <div className="text-xs font-bold uppercase tracking-wide text-slate-500">
+        {label}
       </div>
 
-      {ready ? (
-        <span className="inline-flex items-center gap-1 text-xs font-semibold text-emerald-600">
-          <CheckCircle2 size={14} />
-          Ready
-        </span>
-      ) : (
-        <span className="inline-flex items-center gap-1 text-xs font-semibold text-amber-600">
-          <AlertTriangle size={14} />
-          Check
-        </span>
-      )}
+      <div className="mt-2 text-2xl font-bold text-slate-800">
+        {value}
+      </div>
+
+      <div className="mt-1 text-xs font-medium text-slate-500">
+        {description}
+      </div>
     </div>
   )
 }
 
-function WorkflowStep({
-  number,
-  title,
-  description,
-  active = false,
-}: {
-  number: string
-  title: string
-  description: string
-  active?: boolean
-}) {
-  return (
-    <div
-      className={`rounded-xl border p-4 ${
-        active
-          ? "border-[#cfe1ed] bg-white"
-          : "border-slate-200 bg-slate-50"
-      }`}
-    >
-      <div className="flex items-center gap-3">
-        <span
-          className={`flex h-8 w-8 shrink-0 items-center justify-center rounded-lg text-xs font-bold ${
-            active
-              ? "bg-[#123b5d] text-white"
-              : "bg-slate-200 text-slate-500"
-          }`}
-        >
-          {number}
-        </span>
+export default function BlockPlanning() {
+  const [opportunities, setOpportunities] =
+    useState<Opportunity[]>([])
 
-        <div>
-          <p
-            className={`text-sm font-bold ${
-              active
-                ? "text-slate-900"
-                : "text-slate-500"
-            }`}
-          >
-            {title}
-          </p>
+  const [conflicts, setConflicts] =
+    useState<Conflict[]>([])
 
-          <p className="mt-0.5 text-[11px] leading-4 text-slate-400">
-            {description}
-          </p>
+  const [optimized, setOptimized] =
+    useState<{
+      status: string
+      solver_status: string
+      selected_opportunities: OptimizedItem[]
+      summary: Approval["summary"]
+    } | null>(null)
+
+  const [approval, setApproval] =
+    useState<Approval | null>(null)
+
+  const [handoff, setHandoff] =
+    useState<Handoff | null>(null)
+
+  const [selectedId, setSelectedId] =
+    useState("")
+
+  const [remarks, setRemarks] =
+    useState("")
+
+  const [loading, setLoading] =
+    useState(true)
+
+  const [actionLoading, setActionLoading] =
+    useState(false)
+
+  const [handoffLoading, setHandoffLoading] =
+    useState(false)
+
+  const [error, setError] =
+    useState("")
+
+  const [handoffError, setHandoffError] =
+    useState("")
+
+  const reviewer =
+    "Block Planning Official"
+
+  useEffect(() => {
+    let active = true
+
+    async function load() {
+      setLoading(true)
+      setError("")
+
+      try {
+        const [
+          opportunityData,
+          conflictData,
+          optimizedData,
+          approvalData,
+        ] = await Promise.all([
+          getJson<{
+            opportunities?: Opportunity[]
+          }>("/api/planning/joint-opportunities"),
+
+          getJson<{
+            conflicts?: Conflict[]
+          }>("/api/planning/conflicts"),
+
+          getJson<{
+            status?: string
+            solver_status?: string
+            selected_opportunities?: OptimizedItem[]
+            summary?: Partial<Approval["summary"]>
+          }>("/api/planning/optimized-plan"),
+
+          getJson<Approval>(
+            "/api/planning/approval",
+          ),
+        ])
+
+        if (!active) return
+
+        const opps =
+          Array.isArray(
+            opportunityData.opportunities,
+          )
+            ? opportunityData.opportunities
+            : []
+
+        const conflictList =
+          Array.isArray(
+            conflictData.conflicts,
+          )
+            ? conflictData.conflicts
+            : []
+
+        const selected =
+          Array.isArray(
+            optimizedData.selected_opportunities,
+          )
+            ? optimizedData.selected_opportunities
+            : []
+
+        const summary = {
+          candidate_count: num(
+            optimizedData.summary
+              ?.candidate_count,
+          ),
+          selected_count: num(
+            optimizedData.summary
+              ?.selected_count,
+          ),
+          unscheduled_count: num(
+            optimizedData.summary
+              ?.unscheduled_count,
+          ),
+          total_planned_hours: num(
+            optimizedData.summary
+              ?.total_planned_hours,
+          ),
+          total_opportunity_score: num(
+            optimizedData.summary
+              ?.total_opportunity_score,
+          ),
+        }
+
+        setOpportunities(opps)
+        setConflicts(conflictList)
+
+        setOptimized({
+          status: text(
+            optimizedData.status,
+            "unknown",
+          ),
+          solver_status: text(
+            optimizedData.solver_status,
+            "unknown",
+          ),
+          selected_opportunities:
+            selected,
+          summary,
+        })
+
+        setApproval(approvalData)
+        setRemarks(
+          approvalData.remarks ?? "",
+        )
+
+        if (
+          selected.length > 0 &&
+          !selectedId
+        ) {
+          setSelectedId(
+            selected[0].opportunity_id,
+          )
+        }
+      } catch (err) {
+        if (!active) return
+
+        setError(
+          err instanceof Error
+            ? err.message
+            : "Unable to load block planning data.",
+        )
+      } finally {
+        if (active) {
+          setLoading(false)
+        }
+      }
+    }
+
+    void load()
+
+    return () => {
+      active = false
+    }
+  }, [])
+
+  const selectedOpportunity =
+    opportunities.find(
+      (item) =>
+        item.opportunity_id ===
+        selectedId,
+    ) ?? null
+
+  const selectedConflict =
+    conflicts.find(
+      (item) =>
+        item.opportunity_id ===
+        selectedId,
+    ) ?? null
+
+  const selectedBlocks =
+    optimized?.selected_opportunities ??
+    []
+
+  const candidateCount =
+    opportunities.length
+
+  const reviewCount =
+    conflicts.filter(
+      (item) =>
+        item.status === "Review" ||
+        ["Medium", "High", "Critical"].includes(
+          item.severity,
+        ),
+    ).length
+
+  const averageUtilization =
+    opportunities.length
+      ? opportunities.reduce(
+          (sum, item) =>
+            sum +
+            num(
+              item.utilization_percent,
+            ),
+          0,
+        ) / opportunities.length
+      : 0
+
+  async function approvalAction(
+    action:
+      | "submit"
+      | "approve"
+      | "return",
+  ) {
+    if (
+      action === "return" &&
+      !remarks.trim()
+    ) {
+      setError(
+        "Remarks are required when returning the plan.",
+      )
+      return
+    }
+
+    setActionLoading(true)
+    setError("")
+
+    try {
+      const endpoint =
+        action === "submit"
+          ? "/api/planning/approval/submit"
+          : action === "approve"
+            ? "/api/planning/approval/approve"
+            : "/api/planning/approval/return"
+
+      const response =
+        await fetch(
+          `${API}${endpoint}`,
+          {
+            method: "POST",
+            headers: {
+              "Content-Type":
+                "application/json",
+            },
+            body:
+              action === "submit"
+                ? undefined
+                : JSON.stringify({
+                    reviewer,
+                    remarks:
+                      remarks.trim(),
+                  }),
+          },
+        )
+
+      const data =
+        await response.json()
+
+      if (!response.ok) {
+        throw new Error(
+          text(
+            data?.detail,
+            "Approval action failed.",
+          ),
+        )
+      }
+
+      const updated =
+        data as Approval
+
+      setApproval(updated)
+      setRemarks(
+        updated.remarks ?? "",
+      )
+
+      if (
+        action === "approve" &&
+        updated.status ===
+          "APPROVED"
+      ) {
+        await generateHandoff()
+      }
+    } catch (err) {
+      setError(
+        err instanceof Error
+          ? err.message
+          : "Unable to update approval.",
+      )
+    } finally {
+      setActionLoading(false)
+    }
+  }
+
+  async function generateHandoff() {
+    setHandoffLoading(true)
+    setHandoffError("")
+
+    try {
+      const data =
+        await getJson<Handoff>(
+          "/api/planning/bdms-handoff",
+        )
+
+      setHandoff(data)
+    } catch (err) {
+      setHandoff(null)
+
+      setHandoffError(
+        err instanceof Error
+          ? err.message
+          : "Unable to generate BDMS handoff.",
+      )
+    } finally {
+      setHandoffLoading(false)
+    }
+  }
+
+  if (loading) {
+    return (
+      <div className="min-h-full bg-[#f5f7f9] p-6">
+        <div className="mx-auto max-w-[1500px]">
+          <div className="rounded-2xl border border-slate-200 bg-white p-8 shadow-sm">
+            <div className="text-lg font-bold text-slate-800">
+              Loading Block Planning…
+            </div>
+
+            <div className="mt-2 text-sm font-medium text-slate-500">
+              Reading planning data from RailSync AI backend.
+            </div>
+          </div>
         </div>
       </div>
-    </div>
-  )
-}
+    )
+  }
 
-function WorkflowConnector() {
   return (
-    <div className="hidden items-center justify-center md:flex">
-      <ArrowRight size={17} className="text-slate-300" />
+    <div className="min-h-full bg-[#f5f7f9] p-4 md:p-6">
+      <div className="mx-auto max-w-[1500px] space-y-5">
+
+        {/* HEADER */}
+
+        <header className="flex flex-col gap-3 md:flex-row md:items-end md:justify-between">
+          <div>
+            <div className="text-xs font-bold uppercase tracking-[0.14em] text-[#155f8f]">
+              Planning Control
+            </div>
+
+            <h1 className="mt-1 text-2xl font-bold text-slate-800 md:text-3xl">
+              Block Planning
+            </h1>
+
+            <p className="mt-1 text-sm font-medium text-slate-500">
+              AI-assisted maintenance block planning,
+              operational review and approval.
+            </p>
+          </div>
+
+          <div className="rounded-xl border border-slate-200 bg-white px-4 py-3 shadow-sm">
+            <div className="text-[11px] font-bold uppercase text-slate-500">
+              Planning Horizon
+            </div>
+
+            <div className="mt-1 text-sm font-bold text-slate-800">
+              28 Sep — 04 Oct 2026
+            </div>
+          </div>
+        </header>
+
+        {error && (
+          <div className="rounded-xl border border-red-200 bg-red-50 px-4 py-3 text-sm font-semibold text-red-700">
+            {error}
+          </div>
+        )}
+
+        {/* AI PLAN */}
+
+        <section className="rounded-2xl border border-slate-200 bg-white shadow-sm">
+
+          <div className="border-b border-slate-200 p-5">
+            <div className="flex flex-col gap-2 md:flex-row md:items-center md:justify-between">
+              <div>
+                <h2 className="text-xl font-bold text-slate-800">
+                  AI Proposed Block Plan
+                </h2>
+
+                <p className="mt-1 text-sm font-medium text-slate-500">
+                  CP-SAT optimization selects compatible
+                  maintenance combinations.
+                </p>
+              </div>
+
+              <span className="w-fit rounded-full border border-blue-200 bg-blue-50 px-3 py-1.5 text-xs font-bold text-[#155f8f]">
+                {optimized?.solver_status ??
+                  "Loading"}
+              </span>
+            </div>
+          </div>
+
+          <div className="grid grid-cols-2 gap-3 p-5 lg:grid-cols-4">
+            <Metric
+              label="Candidates"
+              value={String(
+                candidateCount,
+              )}
+              description="Joint opportunities"
+            />
+
+            <Metric
+              label="Selected Blocks"
+              value={String(
+                optimized?.summary
+                  .selected_count ?? 0,
+              )}
+              description="Proposed blocks"
+            />
+
+            <Metric
+              label="Planned Work"
+              value={`${num(
+                optimized?.summary
+                  .total_planned_hours,
+              )} hr`}
+              description="Combined work"
+            />
+
+            <Metric
+              label="Opportunity Value"
+              value={num(
+                optimized?.summary
+                  .total_opportunity_score,
+              ).toFixed(2)}
+              description="Optimization objective"
+            />
+          </div>
+
+          <div className="grid gap-4 px-5 pb-5 lg:grid-cols-[1.1fr_0.9fr]">
+
+            {/* BLOCK LIST */}
+
+            <div className="overflow-hidden rounded-xl border border-slate-200">
+
+              <div className="border-b border-slate-200 px-4 py-3">
+                <div className="text-sm font-bold text-slate-800">
+                  Selected Opportunities
+                </div>
+
+                <div className="text-xs font-medium text-slate-500">
+                  Optimized maintenance combinations.
+                </div>
+              </div>
+
+              {selectedBlocks.length ===
+              0 ? (
+                <div className="p-6 text-center text-sm font-medium text-slate-500">
+                  No selected blocks available.
+                </div>
+              ) : (
+                <div className="divide-y divide-slate-100">
+                  {selectedBlocks.map(
+                    (item) => (
+                      <button
+                        key={
+                          item.opportunity_id
+                        }
+                        type="button"
+                        onClick={() =>
+                          setSelectedId(
+                            item.opportunity_id,
+                          )
+                        }
+                        className={`w-full p-4 text-left transition ${
+                          selectedId ===
+                          item.opportunity_id
+                            ? "bg-blue-50"
+                            : "hover:bg-slate-50"
+                        }`}
+                      >
+                        <div className="flex flex-col gap-3 sm:flex-row sm:items-center sm:justify-between">
+
+                          <div>
+                            <div className="flex flex-wrap items-center gap-2">
+                              <span className="font-bold text-slate-800">
+                                {
+                                  item.opportunity_id
+                                }
+                              </span>
+
+                              <span className="rounded-full border border-emerald-200 bg-emerald-50 px-2 py-1 text-[10px] font-bold text-emerald-700">
+                                SELECTED
+                              </span>
+                            </div>
+
+                            <div className="mt-1 text-sm font-semibold text-slate-600">
+                              {list(
+                                item.request_ids,
+                              ).join(
+                                " + ",
+                              )}
+                            </div>
+
+                            <div className="mt-1 text-xs font-medium text-slate-500">
+                              {item.section} ·{" "}
+                              {dateText(
+                                item.date,
+                              )}{" "}
+                              ·{" "}
+                              {
+                                item.window_id
+                              }
+                            </div>
+                          </div>
+
+                          <div className="flex gap-5">
+                            <div>
+                              <div className="text-[10px] font-bold uppercase text-slate-400">
+                                Duration
+                              </div>
+
+                              <div className="font-bold text-slate-800">
+                                {num(
+                                  item.duration_hours,
+                                )}{" "}
+                                hr
+                              </div>
+                            </div>
+
+                            <div>
+                              <div className="text-[10px] font-bold uppercase text-slate-400">
+                                Utilization
+                              </div>
+
+                              <div className="font-bold text-[#155f8f]">
+                                {num(
+                                  item.utilization_percent,
+                                ).toFixed(
+                                  1,
+                                )}
+                                %
+                              </div>
+                            </div>
+                          </div>
+
+                        </div>
+                      </button>
+                    ),
+                  )}
+                </div>
+              )}
+            </div>
+
+            {/* DETAIL */}
+
+            <div className="rounded-xl border border-slate-200 bg-slate-50 p-5">
+
+              {selectedOpportunity ? (
+                <>
+                  <div className="text-lg font-bold text-slate-800">
+                    {
+                      selectedOpportunity.opportunity_id
+                    }
+                  </div>
+
+                  <div className="mt-1 text-sm font-semibold text-slate-600">
+                    {list(
+                      selectedOpportunity.activities,
+                    ).join(
+                      " + ",
+                    )}
+                  </div>
+
+                  <div className="mt-4 grid grid-cols-2 gap-3">
+                    <Info
+                      label="Section"
+                      value={
+                        selectedOpportunity.section
+                      }
+                    />
+
+                    <Info
+                      label="Date"
+                      value={dateText(
+                        selectedOpportunity.date,
+                      )}
+                    />
+
+                    <Info
+                      label="Window"
+                      value={
+                        selectedOpportunity.window_id
+                      }
+                    />
+
+                    <Info
+                      label="Traffic"
+                      value={
+                        selectedOpportunity.traffic_level
+                      }
+                    />
+
+                    <Info
+                      label="Available"
+                      value={`${num(
+                        selectedOpportunity.available_hours,
+                      )} hr`}
+                    />
+
+                    <Info
+                      label="Required"
+                      value={`${num(
+                        selectedOpportunity.combined_duration_hours,
+                      )} hr`}
+                    />
+                  </div>
+
+                  <div className="mt-4 rounded-xl border border-blue-200 bg-blue-50 p-4">
+                    <div className="text-xs font-bold uppercase text-[#155f8f]">
+                      Compatibility
+                    </div>
+
+                    <div className="mt-2 text-sm font-medium leading-6 text-slate-700">
+                      {list(
+                        selectedOpportunity.compatibility_reasons,
+                      ).join(
+                        " · ",
+                      ) ||
+                        "Compatible maintenance activities identified."}
+                    </div>
+                  </div>
+                </>
+              ) : (
+                <div className="py-10 text-center text-sm font-medium text-slate-500">
+                  Select a block to view details.
+                </div>
+              )}
+
+            </div>
+          </div>
+        </section>
+
+        {/* APPROVAL */}
+
+        <section className="rounded-2xl border border-slate-200 bg-white shadow-sm">
+
+          <div className="border-b border-slate-200 p-5">
+            <div className="flex flex-col gap-2 md:flex-row md:items-center md:justify-between">
+              <div>
+                <h2 className="text-xl font-bold text-slate-800">
+                  Human Approval
+                </h2>
+
+                <p className="mt-1 text-sm font-medium text-slate-500">
+                  Final operational control remains with the
+                  authorized planning official.
+                </p>
+              </div>
+
+              <span
+                className={`w-fit rounded-full border px-3 py-1.5 text-xs font-bold ${
+                  approval?.status ===
+                  "APPROVED"
+                    ? "border-emerald-200 bg-emerald-50 text-emerald-700"
+                    : "border-blue-200 bg-blue-50 text-blue-700"
+                }`}
+              >
+                {approval?.status?.replaceAll(
+                  "_",
+                  " ",
+                ) ?? "PENDING REVIEW"}
+              </span>
+            </div>
+          </div>
+
+          <div className="space-y-4 p-5">
+
+            <div className="grid gap-3 sm:grid-cols-2 lg:grid-cols-5">
+              <Info
+                label="Approval ID"
+                value={
+                  approval?.approval_id ??
+                  "APR-001"
+                }
+              />
+
+              <Info
+                label="Reviewer"
+                value={
+                  approval?.reviewer ??
+                  reviewer
+                }
+              />
+
+              <Info
+                label="Selected"
+                value={String(
+                  approval?.summary
+                    .selected_count ??
+                    0,
+                )}
+              />
+
+              <Info
+                label="Plan"
+                value={
+                  approval?.plan_status ??
+                  "unknown"
+                }
+              />
+
+              <Info
+                label="Solver"
+                value={
+                  approval?.solver_status ??
+                  "unknown"
+                }
+              />
+            </div>
+
+            <textarea
+              value={remarks}
+              onChange={(event) =>
+                setRemarks(
+                  event.target.value,
+                )
+              }
+              disabled={
+                actionLoading ||
+                approval?.status ===
+                  "APPROVED"
+              }
+              rows={3}
+              placeholder="Enter review remarks..."
+              className="w-full rounded-xl border border-slate-300 px-4 py-3 text-sm font-medium text-slate-800 outline-none focus:border-[#155f8f] focus:ring-2 focus:ring-blue-100 disabled:bg-slate-100"
+            />
+
+            {approval?.remarks && (
+              <div className="rounded-xl bg-slate-50 p-4">
+                <div className="text-xs font-bold uppercase text-slate-500">
+                  Latest Remarks
+                </div>
+
+                <div className="mt-1 text-sm font-medium text-slate-700">
+                  {approval.remarks}
+                </div>
+
+                {approval.reviewed_at && (
+                  <div className="mt-2 text-xs font-medium text-slate-500">
+                    {dateTimeText(
+                      approval.reviewed_at,
+                    )}
+                  </div>
+                )}
+              </div>
+            )}
+
+            <div className="flex flex-wrap gap-3">
+
+              {approval?.status !==
+                "APPROVED" && (
+                <>
+                  <button
+                    type="button"
+                    disabled={
+                      actionLoading
+                    }
+                    onClick={() =>
+                      void approvalAction(
+                        "submit",
+                      )
+                    }
+                    className="rounded-xl border border-[#155f8f] bg-[#155f8f] px-4 py-2.5 text-sm font-bold text-white hover:bg-[#104d75] disabled:opacity-50"
+                  >
+                    Submit for Review
+                  </button>
+
+                  <button
+                    type="button"
+                    disabled={
+                      actionLoading
+                    }
+                    onClick={() =>
+                      void approvalAction(
+                        "return",
+                      )
+                    }
+                    className="rounded-xl border border-orange-200 bg-orange-50 px-4 py-2.5 text-sm font-bold text-orange-700 hover:bg-orange-100 disabled:opacity-50"
+                  >
+                    Return for Revision
+                  </button>
+
+                  <button
+                    type="button"
+                    disabled={
+                      actionLoading
+                    }
+                    onClick={() =>
+                      void approvalAction(
+                        "approve",
+                      )
+                    }
+                    className="rounded-xl border border-emerald-600 bg-emerald-600 px-4 py-2.5 text-sm font-bold text-white hover:bg-emerald-700 disabled:opacity-50"
+                  >
+                    {actionLoading
+                      ? "Processing..."
+                      : "Approve Block Plan"}
+                  </button>
+                </>
+              )}
+
+              {approval?.status ===
+                "APPROVED" && (
+                <div className="rounded-xl border border-emerald-200 bg-emerald-50 px-4 py-2.5 text-sm font-bold text-emerald-700">
+                  ✓ Plan Approved
+                </div>
+              )}
+
+            </div>
+          </div>
+        </section>
+
+        {/* BDMS */}
+
+        <section className="rounded-2xl border border-slate-200 bg-white shadow-sm">
+
+          <div className="border-b border-slate-200 p-5">
+            <div className="flex flex-col gap-2 md:flex-row md:items-center md:justify-between">
+              <div>
+                <h2 className="text-xl font-bold text-slate-800">
+                  BDMS Handoff
+                </h2>
+
+                <p className="mt-1 text-sm font-medium text-slate-500">
+                  Generate the structured handoff package after
+                  human approval.
+                </p>
+              </div>
+
+              {handoff && (
+                <span className="w-fit rounded-full border border-emerald-200 bg-emerald-50 px-3 py-1.5 text-xs font-bold text-emerald-700">
+                  ✓ Handoff Generated
+                </span>
+              )}
+            </div>
+          </div>
+
+          <div className="p-5">
+
+            {!handoff ? (
+              <div className="rounded-xl border border-dashed border-slate-300 bg-slate-50 p-5">
+
+                <div className="grid gap-4 md:grid-cols-2 lg:grid-cols-4">
+
+                  <Info
+                    label="Destination"
+                    value="BDMS"
+                  />
+
+                  <Info
+                    label="Approval"
+                    value={
+                      approval?.approval_id ??
+                      "APR-001"
+                    }
+                  />
+
+                  <Info
+                    label="Blocks"
+                    value={String(
+                      selectedBlocks.length,
+                    )}
+                  />
+
+                  <Info
+                    label="Work"
+                    value={`${num(
+                      optimized?.summary
+                        .total_planned_hours,
+                    )} hr`}
+                  />
+
+                </div>
+
+                <button
+                  type="button"
+                  disabled={
+                    approval?.status !==
+                      "APPROVED" ||
+                    handoffLoading
+                  }
+                  onClick={() =>
+                    void generateHandoff()
+                  }
+                  className="mt-4 rounded-xl border border-[#155f8f] bg-[#155f8f] px-5 py-2.5 text-sm font-bold text-white hover:bg-[#104d75] disabled:cursor-not-allowed disabled:bg-slate-300"
+                >
+                  {handoffLoading
+                    ? "Generating..."
+                    : "Generate BDMS Handoff"}
+                </button>
+
+                {handoffError && (
+                  <div className="mt-4 rounded-xl border border-red-200 bg-red-50 p-3 text-sm font-semibold text-red-700">
+                    {handoffError}
+                  </div>
+                )}
+
+              </div>
+            ) : (
+              <div className="space-y-4">
+
+                <div className="grid gap-3 sm:grid-cols-2 lg:grid-cols-5">
+
+                  <Info
+                    label="Handoff ID"
+                    value={
+                      handoff.handoff_id
+                    }
+                  />
+
+                  <Info
+                    label="Approval"
+                    value={
+                      handoff.source
+                        .approval_id
+                    }
+                  />
+
+                  <Info
+                    label="Reviewer"
+                    value={
+                      handoff.source
+                        .reviewer
+                    }
+                  />
+
+                  <Info
+                    label="Blocks"
+                    value={String(
+                      num(
+                        handoff.plan
+                          .selected_blocks,
+                      ),
+                    )}
+                  />
+
+                  <Info
+                    label="Planned Work"
+                    value={`${num(
+                      handoff.plan
+                        .planned_work_hours,
+                    )} hr`}
+                  />
+
+                </div>
+
+                <div className="overflow-x-auto rounded-xl border border-slate-200">
+
+                  <table className="w-full min-w-[700px] text-left">
+                    <thead className="bg-slate-50">
+                      <tr>
+                        <th className="px-4 py-3 text-xs font-bold uppercase text-slate-500">
+                          Opportunity
+                        </th>
+
+                        <th className="px-4 py-3 text-xs font-bold uppercase text-slate-500">
+                          Requests
+                        </th>
+
+                        <th className="px-4 py-3 text-xs font-bold uppercase text-slate-500">
+                          Section
+                        </th>
+
+                        <th className="px-4 py-3 text-xs font-bold uppercase text-slate-500">
+                          Duration
+                        </th>
+
+                        <th className="px-4 py-3 text-xs font-bold uppercase text-slate-500">
+                          Status
+                        </th>
+                      </tr>
+                    </thead>
+
+                    <tbody className="divide-y divide-slate-100">
+                      {handoff.handoff_items.map(
+                        (item) => (
+                          <tr
+                            key={
+                              item.opportunity_id
+                            }
+                            className="hover:bg-slate-50"
+                          >
+                            <td className="px-4 py-3 text-sm font-bold text-slate-800">
+                              {
+                                item.opportunity_id
+                              }
+                            </td>
+
+                            <td className="px-4 py-3 text-sm font-medium text-slate-600">
+                              {list(
+                                item.request_ids,
+                              ).join(
+                                " + ",
+                              )}
+                            </td>
+
+                            <td className="px-4 py-3">
+                              <div className="text-sm font-bold text-slate-800">
+                                {
+                                  item.section
+                                }
+                              </div>
+
+                              <div className="text-xs text-slate-500">
+                                {dateText(
+                                  item.date,
+                                )}
+                              </div>
+                            </td>
+
+                            <td className="px-4 py-3 text-sm font-bold text-slate-800">
+                              {num(
+                                item.planned_duration_hours,
+                              )}{" "}
+                              hr
+                            </td>
+
+                            <td className="px-4 py-3">
+                              <span className="rounded-full border border-emerald-200 bg-emerald-50 px-2.5 py-1 text-[11px] font-bold text-emerald-700">
+                                {
+                                  item.handoff_status
+                                }
+                              </span>
+                            </td>
+                          </tr>
+                        ),
+                      )}
+                    </tbody>
+                  </table>
+
+                </div>
+
+                <div className="rounded-xl border border-amber-200 bg-amber-50 p-4 text-sm font-medium leading-6 text-amber-900">
+                  {handoff.integration_status}
+                </div>
+
+              </div>
+            )}
+
+          </div>
+        </section>
+
+        {/* SUMMARY */}
+
+        <div className="grid gap-4 md:grid-cols-3">
+
+          <Metric
+            label="Total Opportunities"
+            value={String(
+              candidateCount,
+            )}
+            description="Joint maintenance combinations"
+          />
+
+          <Metric
+            label="Review Required"
+            value={String(
+              reviewCount,
+            )}
+            description="Operational review records"
+          />
+
+          <Metric
+            label="Average Utilization"
+            value={`${num(
+              averageUtilization,
+            ).toFixed(0)}%`}
+            description="Planning-window utilization"
+          />
+
+        </div>
+
+        {/* CONFLICTS */}
+
+        <section className="rounded-2xl border border-slate-200 bg-white shadow-sm">
+
+          <div className="border-b border-slate-200 p-5">
+            <h2 className="text-xl font-bold text-slate-800">
+              Conflict Analysis
+            </h2>
+
+            <p className="mt-1 text-sm font-medium text-slate-500">
+              Operational checks applied to proposed opportunities.
+            </p>
+          </div>
+
+          <div className="divide-y divide-slate-100">
+
+            {conflicts.length === 0 && (
+              <div className="p-6 text-center text-sm font-medium text-slate-500">
+                No conflict records available.
+              </div>
+            )}
+
+            {conflicts.map(
+              (item) => (
+                <button
+                  key={
+                    item.opportunity_id
+                  }
+                  type="button"
+                  onClick={() =>
+                    setSelectedId(
+                      item.opportunity_id,
+                    )
+                  }
+                  className="w-full p-4 text-left transition hover:bg-slate-50"
+                >
+                  <div className="grid gap-3 md:grid-cols-[1fr_1fr_0.7fr_0.7fr_auto] md:items-center">
+
+                    <div>
+                      <div className="text-sm font-bold text-slate-800">
+                        {
+                          item.opportunity_id
+                        }
+                      </div>
+
+                      <div className="mt-1 text-xs font-medium text-slate-500">
+                        {list(
+                          item.request_ids,
+                        ).join(
+                          " + ",
+                        )}
+                      </div>
+                    </div>
+
+                    <div>
+                      <div className="text-sm font-bold text-slate-700">
+                        {item.section}
+                      </div>
+
+                      <div className="text-xs text-slate-500">
+                        {dateText(
+                          item.date,
+                        )}{" "}
+                        ·{" "}
+                        {
+                          item.window_id
+                        }
+                      </div>
+                    </div>
+
+                    <div>
+                      <div className="text-[10px] font-bold uppercase text-slate-400">
+                        Utilization
+                      </div>
+
+                      <div className="text-sm font-bold text-slate-800">
+                        {num(
+                          item.utilization_percent,
+                        ).toFixed(
+                          1,
+                        )}
+                        %
+                      </div>
+                    </div>
+
+                    <div>
+                      <div className="text-[10px] font-bold uppercase text-slate-400">
+                        Traffic
+                      </div>
+
+                      <div className="text-sm font-bold text-slate-800">
+                        {
+                          item.traffic_level
+                        }
+                      </div>
+                    </div>
+
+                    <span
+                      className={`w-fit rounded-full border px-3 py-1.5 text-xs font-bold ${statusStyle(
+                        item.severity,
+                      )}`}
+                    >
+                      {
+                        item.severity
+                      }
+                    </span>
+
+                  </div>
+                </button>
+              ),
+            )}
+
+          </div>
+        </section>
+
+        {/* DETAIL */}
+
+        {selectedConflict && (
+          <section className="rounded-2xl border border-slate-200 bg-white shadow-sm">
+
+            <div className="border-b border-slate-200 p-5">
+              <div className="flex items-center justify-between gap-3">
+
+                <div>
+                  <h2 className="text-xl font-bold text-slate-800">
+                    Operational Review
+                  </h2>
+
+                  <p className="mt-1 text-sm font-medium text-slate-500">
+                    {
+                      selectedConflict.opportunity_id
+                    }
+                  </p>
+                </div>
+
+                <span
+                  className={`rounded-full border px-3 py-1.5 text-xs font-bold ${statusStyle(
+                    selectedConflict.severity,
+                  )}`}
+                >
+                  {
+                    selectedConflict.severity
+                  }
+                </span>
+
+              </div>
+            </div>
+
+            <div className="grid gap-4 p-5 lg:grid-cols-2">
+
+              <div className="grid grid-cols-2 gap-3">
+
+                <Info
+                  label="Traffic"
+                  value={
+                    selectedConflict.traffic_level
+                  }
+                />
+
+                <Info
+                  label="Block Allowed"
+                  value={
+                    selectedConflict.block_allowed
+                      ? "Yes"
+                      : "No"
+                  }
+                />
+
+                <Info
+                  label="Available"
+                  value={`${num(
+                    selectedConflict.available_hours,
+                  )} hr`}
+                />
+
+                <Info
+                  label="Required"
+                  value={`${num(
+                    selectedConflict.required_hours,
+                  )} hr`}
+                />
+
+                <Info
+                  label="Passenger Trains"
+                  value={String(
+                    num(
+                      selectedConflict.passenger_train_count,
+                    ),
+                  )}
+                />
+
+                <Info
+                  label="Goods Trains"
+                  value={String(
+                    num(
+                      selectedConflict.goods_train_count,
+                    ),
+                  )}
+                />
+
+              </div>
+
+              <div className="rounded-xl border border-slate-200 bg-slate-50 p-5">
+
+                <div className="text-xs font-bold uppercase text-slate-500">
+                  Recommendation
+                </div>
+
+                <div className="mt-2 text-sm font-bold leading-6 text-slate-800">
+                  {
+                    selectedConflict.recommendation
+                  }
+                </div>
+
+                {list(
+                  selectedConflict.conflict_reasons,
+                ).length > 0 && (
+                  <ul className="mt-4 space-y-2">
+                    {list(
+                      selectedConflict.conflict_reasons,
+                    ).map(
+                      (reason) => (
+                        <li
+                          key={reason}
+                          className="text-sm font-medium text-slate-600"
+                        >
+                          • {reason}
+                        </li>
+                      ),
+                    )}
+                  </ul>
+                )}
+
+              </div>
+
+            </div>
+          </section>
+        )}
+
+        {/* WORKFLOW */}
+
+        <section className="rounded-2xl border border-slate-200 bg-white p-5 shadow-sm">
+
+          <h2 className="text-xl font-bold text-slate-800">
+            Planning Workflow
+          </h2>
+
+          <div className="mt-4 grid gap-3 sm:grid-cols-2 lg:grid-cols-5">
+
+            {[
+              ["01", "Data Fusion"],
+              ["02", "Joint Opportunities"],
+              ["03", "Optimization"],
+              ["04", "Human Approval"],
+              ["05", "BDMS Handoff"],
+            ].map(
+              ([number, title]) => (
+                <div
+                  key={number}
+                  className="rounded-xl border border-slate-200 bg-slate-50 p-4"
+                >
+                  <div className="flex h-8 w-8 items-center justify-center rounded-lg bg-blue-50 text-xs font-bold text-[#155f8f]">
+                    {number}
+                  </div>
+
+                  <div className="mt-3 text-sm font-bold text-slate-800">
+                    {title}
+                  </div>
+                </div>
+              ),
+            )}
+
+          </div>
+        </section>
+
+        <div className="rounded-xl border border-slate-200 bg-slate-50 p-4 text-xs font-medium leading-5 text-slate-500">
+          Prototype note: RailSync AI uses synthetic datasets modeled
+          on Indian Railway operational scenarios. BDMS handoff is a
+          structured prototype package and is not connected to a live
+          railway BDMS system.
+        </div>
+
+      </div>
     </div>
   )
 }
-
-export default BlockPlanning

@@ -1,4 +1,4 @@
-import { useMemo, useState } from "react"
+import { useEffect, useMemo, useState } from "react"
 import type { PageKey } from "./OperationsOverview"
 
 import {
@@ -16,6 +16,8 @@ import {
   X,
 } from "lucide-react"
 
+const API_BASE = "http://127.0.0.1:8000"
+
 type AlertSeverity = "Critical" | "High" | "Medium" | "Info"
 type AlertStatus = "Pending" | "Acknowledged" | "Resolved"
 
@@ -25,7 +27,12 @@ type AlertItem = {
   description: string
   severity: AlertSeverity
   status: AlertStatus
-  category: "Block Planning" | "Resource" | "Maintenance" | "Operations" | "System"
+  category:
+    | "Block Planning"
+    | "Resource"
+    | "Maintenance"
+    | "Operations"
+    | "System"
   source: string
   timestamp: string
   affectedArea: string
@@ -34,132 +41,15 @@ type AlertItem = {
   targetPage: PageKey
 }
 
+type AlertsResponse = {
+  status?: string
+  total_alerts?: number
+  alerts?: AlertItem[]
+}
+
 type AlertsNotificationsProps = {
   onNavigate: (page: PageKey) => void
 }
-
-const alerts: AlertItem[] = [
-  {
-    id: "ALT-024",
-    title: "Resource shortage affecting proposed block",
-    description:
-      "Required OHE maintenance team is not fully available for the proposed block window.",
-    severity: "Critical",
-    status: "Pending",
-    category: "Resource",
-    source: "Resource Readiness",
-    timestamp: "08:42",
-    affectedArea: "KGP–BLS Corridor",
-    impact: "Proposed block may require rescheduling.",
-    action: "Review resource availability and assign alternate team.",
-    targetPage: "Resource Readiness",
-  },
-  {
-    id: "ALT-023",
-    title: "Block conflict detected",
-    description:
-      "Two maintenance activities overlap within the same operational window.",
-    severity: "Critical",
-    status: "Pending",
-    category: "Block Planning",
-    source: "Block Planning",
-    timestamp: "08:18",
-    affectedArea: "Kharagpur Yard",
-    impact: "Simultaneous execution is not recommended.",
-    action: "Review conflict and combine or reschedule activities.",
-    targetPage: "Block Planning",
-  },
-  {
-    id: "ALT-022",
-    title: "Maintenance request approaching due date",
-    description:
-      "A high-priority signalling maintenance request is due within 24 hours.",
-    severity: "High",
-    status: "Pending",
-    category: "Maintenance",
-    source: "SMMS",
-    timestamp: "07:56",
-    affectedArea: "KGP–MDN Section",
-    impact: "Delay may increase operational maintenance backlog.",
-    action: "Review request and include it in the next planning cycle.",
-    targetPage: "Maintenance Requests",
-  },
-  {
-    id: "ALT-021",
-    title: "High-priority request awaiting planning",
-    description:
-      "A critical track maintenance request has not yet been assigned to a block.",
-    severity: "High",
-    status: "Acknowledged",
-    category: "Maintenance",
-    source: "TMS",
-    timestamp: "07:34",
-    affectedArea: "BLS Section",
-    impact: "Maintenance completion may be delayed.",
-    action: "Review maintenance request and evaluate block opportunity.",
-    targetPage: "Maintenance Requests",
-  },
-  {
-    id: "ALT-020",
-    title: "Machine availability updated",
-    description:
-      "Track machine availability has changed for the upcoming planning window.",
-    severity: "Medium",
-    status: "Pending",
-    category: "Resource",
-    source: "TMMMS",
-    timestamp: "07:12",
-    affectedArea: "Kharagpur Division",
-    impact: "Resource assignment may need adjustment.",
-    action: "Review resource readiness before finalizing the plan.",
-    targetPage: "Resource Readiness",
-  },
-  {
-    id: "ALT-019",
-    title: "Block plan awaiting approval",
-    description:
-      "The proposed weekly block plan is ready for human review.",
-    severity: "Medium",
-    status: "Acknowledged",
-    category: "Block Planning",
-    source: "RailSync AI",
-    timestamp: "06:48",
-    affectedArea: "Week 39 Planning",
-    impact: "Approval is required before downstream handoff.",
-    action: "Review proposed plan and approve or revise.",
-    targetPage: "Block Planning",
-  },
-  {
-    id: "ALT-018",
-    title: "Operational data synchronized",
-    description:
-      "Latest operational and maintenance data has been successfully synchronized.",
-    severity: "Info",
-    status: "Resolved",
-    category: "System",
-    source: "Data Fusion",
-    timestamp: "06:30",
-    affectedArea: "RailSync AI Platform",
-    impact: "No operational impact.",
-    action: "No action required.",
-    targetPage: "Operations Overview",
-  },
-  {
-    id: "ALT-017",
-    title: "Daily planning summary available",
-    description:
-      "The latest operational planning summary is available for review.",
-    severity: "Info",
-    status: "Resolved",
-    category: "Operations",
-    source: "Operations Overview",
-    timestamp: "Yesterday",
-    affectedArea: "Kharagpur Division",
-    impact: "No operational impact.",
-    action: "Review the daily operational summary if required.",
-    targetPage: "Operations Overview",
-  },
-]
 
 const severityConfig: Record<
   AlertSeverity,
@@ -209,8 +99,14 @@ function StatCard({
           <p className="text-xs font-semibold uppercase tracking-wide text-slate-500">
             {label}
           </p>
-          <p className="mt-2 text-2xl font-bold text-slate-900">{value}</p>
-          <p className="mt-1 text-xs text-slate-500">{description}</p>
+
+          <p className="mt-2 text-2xl font-bold text-slate-900">
+            {value}
+          </p>
+
+          <p className="mt-1 text-xs text-slate-500">
+            {description}
+          </p>
         </div>
 
         <div className="rounded-lg bg-slate-100 p-2 text-slate-600">
@@ -224,11 +120,61 @@ function StatCard({
 export default function AlertsNotifications({
   onNavigate,
 }: AlertsNotificationsProps) {
+  const [alerts, setAlerts] = useState<AlertItem[]>([])
+  const [loading, setLoading] = useState(true)
+  const [error, setError] = useState("")
+
   const [search, setSearch] = useState("")
   const [severity, setSeverity] = useState("All")
   const [status, setStatus] = useState("All")
   const [category, setCategory] = useState("All")
-  const [selectedId, setSelectedId] = useState(alerts[0].id)
+  const [selectedId, setSelectedId] = useState("")
+
+  async function loadAlerts() {
+    try {
+      setError("")
+
+      const response = await fetch(`${API_BASE}/api/alerts`)
+
+      if (!response.ok) {
+        throw new Error(`Alerts request failed: ${response.status}`)
+      }
+
+      const data: AlertsResponse = await response.json()
+      const nextAlerts = Array.isArray(data.alerts)
+        ? data.alerts
+        : []
+
+      setAlerts(nextAlerts)
+
+      setSelectedId((currentId) => {
+        if (
+          currentId &&
+          nextAlerts.some((alert) => alert.id === currentId)
+        ) {
+          return currentId
+        }
+
+        return nextAlerts[0]?.id ?? ""
+      })
+    } catch (requestError) {
+      setError(
+        requestError instanceof Error
+          ? requestError.message
+          : "Unable to load alerts.",
+      )
+    } finally {
+      setLoading(false)
+    }
+  }
+
+  useEffect(() => {
+    loadAlerts()
+
+    const interval = window.setInterval(loadAlerts, 30000)
+
+    return () => window.clearInterval(interval)
+  }, [])
 
   const filteredAlerts = useMemo(() => {
     const query = search.trim().toLowerCase()
@@ -257,7 +203,7 @@ export default function AlertsNotifications({
         matchesCategory
       )
     })
-  }, [search, severity, status, category])
+  }, [alerts, search, severity, status, category])
 
   const selectedAlert =
     alerts.find((alert) => alert.id === selectedId) ??
@@ -265,7 +211,21 @@ export default function AlertsNotifications({
     alerts[0]
 
   const criticalCount = alerts.filter(
-    (alert) => alert.severity === "Critical" && alert.status !== "Resolved",
+    (alert) =>
+      alert.severity === "Critical" &&
+      alert.status !== "Resolved",
+  ).length
+
+  const highCount = alerts.filter(
+    (alert) =>
+      alert.severity === "High" &&
+      alert.status !== "Resolved",
+  ).length
+
+  const mediumCount = alerts.filter(
+    (alert) =>
+      alert.severity === "Medium" &&
+      alert.status !== "Resolved",
   ).length
 
   const pendingCount = alerts.filter(
@@ -287,7 +247,81 @@ export default function AlertsNotifications({
     setCategory("All")
   }
 
-  const SeverityIcon = severityConfig[selectedAlert.severity].icon
+  if (loading) {
+    return (
+      <div className="space-y-6">
+        <div>
+          <h1 className="text-2xl font-bold tracking-tight text-slate-900">
+            Alerts &amp; Notifications
+          </h1>
+
+          <p className="mt-1 text-sm text-slate-600">
+            Monitor operational issues, planning conflicts, resource
+            constraints, and important system notifications.
+          </p>
+        </div>
+
+        <div className="rounded-xl border border-slate-200 bg-white p-10 text-center shadow-sm">
+          <Bell
+            size={30}
+            className="mx-auto animate-pulse text-slate-300"
+          />
+
+          <p className="mt-3 text-sm font-semibold text-slate-700">
+            Loading live notifications...
+          </p>
+
+          <p className="mt-1 text-xs text-slate-500">
+            RailSync AI is generating the current alert set.
+          </p>
+        </div>
+      </div>
+    )
+  }
+
+  if (error) {
+    return (
+      <div className="space-y-6">
+        <div>
+          <h1 className="text-2xl font-bold tracking-tight text-slate-900">
+            Alerts &amp; Notifications
+          </h1>
+
+          <p className="mt-1 text-sm text-slate-600">
+            Monitor operational issues, planning conflicts, resource
+            constraints, and important system notifications.
+          </p>
+        </div>
+
+        <div className="rounded-xl border border-red-200 bg-red-50 p-8 text-center">
+          <ShieldAlert
+            size={30}
+            className="mx-auto text-red-500"
+          />
+
+          <p className="mt-3 text-sm font-semibold text-red-800">
+            Notifications unavailable
+          </p>
+
+          <p className="mt-1 text-xs text-red-700">
+            {error}
+          </p>
+
+          <button
+            type="button"
+            onClick={loadAlerts}
+            className="mt-4 rounded-lg bg-red-700 px-4 py-2 text-xs font-semibold text-white hover:bg-red-800"
+          >
+            Retry
+          </button>
+        </div>
+      </div>
+    )
+  }
+
+  const SeverityIcon = selectedAlert
+    ? severityConfig[selectedAlert.severity].icon
+    : Bell
 
   return (
     <div className="space-y-6">
@@ -301,7 +335,7 @@ export default function AlertsNotifications({
             </div>
 
             <h1 className="text-2xl font-bold tracking-tight text-slate-900">
-              Alerts & Notifications
+              Alerts &amp; Notifications
             </h1>
 
             <p className="mt-1 max-w-3xl text-sm text-slate-600">
@@ -314,6 +348,7 @@ export default function AlertsNotifications({
             <p className="text-xs font-semibold uppercase tracking-wide text-slate-500">
               Notification status
             </p>
+
             <p className="mt-1 text-sm font-semibold text-slate-900">
               {pendingCount} actions require attention
             </p>
@@ -331,23 +366,23 @@ export default function AlertsNotifications({
         />
 
         <StatCard
-          label="Pending Actions"
-          value={String(pendingCount)}
-          description="Awaiting official action"
-          icon={Clock3}
+          label="High"
+          value={String(highCount)}
+          description="High-priority notifications"
+          icon={AlertCircle}
         />
 
         <StatCard
-          label="Informational"
-          value={String(infoCount)}
-          description="Recent system notifications"
-          icon={Info}
+          label="Medium"
+          value={String(mediumCount)}
+          description="Review recommended"
+          icon={AlertTriangle}
         />
 
         <StatCard
           label="Resolved"
           value={String(resolvedCount)}
-          description="Closed notifications"
+          description={`${infoCount} informational notifications`}
           icon={CheckCircle2}
         />
       </div>
@@ -362,8 +397,10 @@ export default function AlertsNotifications({
                 <h2 className="text-base font-semibold text-slate-900">
                   Notification Centre
                 </h2>
+
                 <p className="mt-1 text-xs text-slate-500">
-                  {filteredAlerts.length} notifications matching current filters
+                  {filteredAlerts.length} notifications matching
+                  current filters
                 </p>
               </div>
 
@@ -372,9 +409,12 @@ export default function AlertsNotifications({
                   size={16}
                   className="absolute left-3 top-1/2 -translate-y-1/2 text-slate-400"
                 />
+
                 <input
                   value={search}
-                  onChange={(event) => setSearch(event.target.value)}
+                  onChange={(event) =>
+                    setSearch(event.target.value)
+                  }
                   placeholder="Search alerts..."
                   className="h-9 w-full rounded-lg border border-slate-200 bg-slate-50 pl-9 pr-3 text-sm outline-none transition focus:border-slate-400 focus:bg-white"
                 />
@@ -389,7 +429,9 @@ export default function AlertsNotifications({
 
               <select
                 value={severity}
-                onChange={(event) => setSeverity(event.target.value)}
+                onChange={(event) =>
+                  setSeverity(event.target.value)
+                }
                 className="h-8 rounded-md border border-slate-200 bg-white px-2 text-xs text-slate-700 outline-none"
               >
                 <option>All</option>
@@ -401,7 +443,9 @@ export default function AlertsNotifications({
 
               <select
                 value={status}
-                onChange={(event) => setStatus(event.target.value)}
+                onChange={(event) =>
+                  setStatus(event.target.value)
+                }
                 className="h-8 rounded-md border border-slate-200 bg-white px-2 text-xs text-slate-700 outline-none"
               >
                 <option>All</option>
@@ -412,7 +456,9 @@ export default function AlertsNotifications({
 
               <select
                 value={category}
-                onChange={(event) => setCategory(event.target.value)}
+                onChange={(event) =>
+                  setCategory(event.target.value)
+                }
                 className="h-8 rounded-md border border-slate-200 bg-white px-2 text-xs text-slate-700 outline-none"
               >
                 <option>All</option>
@@ -442,10 +488,15 @@ export default function AlertsNotifications({
           <div className="divide-y divide-slate-100">
             {filteredAlerts.length === 0 ? (
               <div className="p-10 text-center">
-                <Bell className="mx-auto text-slate-300" size={30} />
+                <Bell
+                  className="mx-auto text-slate-300"
+                  size={30}
+                />
+
                 <p className="mt-3 text-sm font-semibold text-slate-700">
                   No notifications found
                 </p>
+
                 <p className="mt-1 text-xs text-slate-500">
                   Try changing the current filters.
                 </p>
@@ -454,7 +505,7 @@ export default function AlertsNotifications({
               filteredAlerts.map((alert) => {
                 const config = severityConfig[alert.severity]
                 const Icon = config.icon
-                const isSelected = alert.id === selectedAlert.id
+                const isSelected = alert.id === selectedAlert?.id
 
                 return (
                   <button
@@ -535,14 +586,18 @@ export default function AlertsNotifications({
                 <p className="text-xs font-semibold uppercase tracking-wide text-slate-500">
                   Alert details
                 </p>
+
                 <p className="mt-1 text-sm font-semibold text-slate-900">
-                  {selectedAlert.id}
+                  {selectedAlert?.id ?? "—"}
                 </p>
               </div>
 
               <div
                 className={`flex h-9 w-9 items-center justify-center rounded-lg border ${
-                  severityConfig[selectedAlert.severity].className
+                  selectedAlert
+                    ? severityConfig[selectedAlert.severity]
+                        .className
+                    : "border-slate-200 bg-slate-50 text-slate-400"
                 }`}
               >
                 <SeverityIcon size={17} />
@@ -550,92 +605,113 @@ export default function AlertsNotifications({
             </div>
           </div>
 
-          <div className="space-y-5 p-5">
-            <div>
-              <div className="flex flex-wrap items-center gap-2">
-                <h3 className="text-lg font-semibold text-slate-900">
-                  {selectedAlert.title}
-                </h3>
+          {selectedAlert ? (
+            <div className="space-y-5 p-5">
+              <div>
+                <div className="flex flex-wrap items-center gap-2">
+                  <h3 className="text-lg font-semibold text-slate-900">
+                    {selectedAlert.title}
+                  </h3>
 
-                <span
-                  className={`rounded-full px-2 py-1 text-[10px] font-semibold ${
-                    severityConfig[selectedAlert.severity].badge
-                  }`}
-                >
-                  {selectedAlert.severity}
-                </span>
+                  <span
+                    className={`rounded-full px-2 py-1 text-[10px] font-semibold ${
+                      severityConfig[selectedAlert.severity].badge
+                    }`}
+                  >
+                    {selectedAlert.severity}
+                  </span>
+                </div>
+
+                <p className="mt-2 text-sm leading-6 text-slate-600">
+                  {selectedAlert.description}
+                </p>
               </div>
 
-              <p className="mt-2 text-sm leading-6 text-slate-600">
-                {selectedAlert.description}
+              <div className="grid grid-cols-2 gap-3">
+                <div className="rounded-lg bg-slate-50 p-3">
+                  <p className="text-[10px] font-semibold uppercase tracking-wide text-slate-500">
+                    Source
+                  </p>
+
+                  <p className="mt-1 text-xs font-semibold text-slate-800">
+                    {selectedAlert.source}
+                  </p>
+                </div>
+
+                <div className="rounded-lg bg-slate-50 p-3">
+                  <p className="text-[10px] font-semibold uppercase tracking-wide text-slate-500">
+                    Status
+                  </p>
+
+                  <p className="mt-1 text-xs font-semibold text-slate-800">
+                    {selectedAlert.status}
+                  </p>
+                </div>
+
+                <div className="rounded-lg bg-slate-50 p-3">
+                  <p className="text-[10px] font-semibold uppercase tracking-wide text-slate-500">
+                    Affected area
+                  </p>
+
+                  <p className="mt-1 text-xs font-semibold text-slate-800">
+                    {selectedAlert.affectedArea}
+                  </p>
+                </div>
+
+                <div className="rounded-lg bg-slate-50 p-3">
+                  <p className="text-[10px] font-semibold uppercase tracking-wide text-slate-500">
+                    Time
+                  </p>
+
+                  <p className="mt-1 text-xs font-semibold text-slate-800">
+                    {selectedAlert.timestamp}
+                  </p>
+                </div>
+              </div>
+
+              <div>
+                <p className="text-xs font-semibold uppercase tracking-wide text-slate-500">
+                  Operational impact
+                </p>
+
+                <div className="mt-2 rounded-lg border border-slate-200 bg-white p-3 text-sm leading-6 text-slate-700">
+                  {selectedAlert.impact}
+                </div>
+              </div>
+
+              <div>
+                <p className="text-xs font-semibold uppercase tracking-wide text-slate-500">
+                  Recommended action
+                </p>
+
+                <div className="mt-2 rounded-lg border border-blue-100 bg-blue-50 p-3 text-sm leading-6 text-blue-900">
+                  {selectedAlert.action}
+                </div>
+              </div>
+
+              <button
+                type="button"
+                onClick={() =>
+                  onNavigate(selectedAlert.targetPage)
+                }
+                className="flex w-full items-center justify-center gap-2 rounded-lg bg-slate-900 px-4 py-2.5 text-sm font-semibold text-white transition hover:bg-slate-800"
+              >
+                Open {selectedAlert.targetPage}
+                <ArrowRight size={16} />
+              </button>
+            </div>
+          ) : (
+            <div className="p-8 text-center">
+              <Bell
+                size={28}
+                className="mx-auto text-slate-300"
+              />
+
+              <p className="mt-3 text-sm font-semibold text-slate-700">
+                No alert selected
               </p>
             </div>
-
-            <div className="grid grid-cols-2 gap-3">
-              <div className="rounded-lg bg-slate-50 p-3">
-                <p className="text-[10px] font-semibold uppercase tracking-wide text-slate-500">
-                  Source
-                </p>
-                <p className="mt-1 text-xs font-semibold text-slate-800">
-                  {selectedAlert.source}
-                </p>
-              </div>
-
-              <div className="rounded-lg bg-slate-50 p-3">
-                <p className="text-[10px] font-semibold uppercase tracking-wide text-slate-500">
-                  Status
-                </p>
-                <p className="mt-1 text-xs font-semibold text-slate-800">
-                  {selectedAlert.status}
-                </p>
-              </div>
-
-              <div className="rounded-lg bg-slate-50 p-3">
-                <p className="text-[10px] font-semibold uppercase tracking-wide text-slate-500">
-                  Affected area
-                </p>
-                <p className="mt-1 text-xs font-semibold text-slate-800">
-                  {selectedAlert.affectedArea}
-                </p>
-              </div>
-
-              <div className="rounded-lg bg-slate-50 p-3">
-                <p className="text-[10px] font-semibold uppercase tracking-wide text-slate-500">
-                  Time
-                </p>
-                <p className="mt-1 text-xs font-semibold text-slate-800">
-                  {selectedAlert.timestamp}
-                </p>
-              </div>
-            </div>
-
-            <div>
-              <p className="text-xs font-semibold uppercase tracking-wide text-slate-500">
-                Operational impact
-              </p>
-              <div className="mt-2 rounded-lg border border-slate-200 bg-white p-3 text-sm leading-6 text-slate-700">
-                {selectedAlert.impact}
-              </div>
-            </div>
-
-            <div>
-              <p className="text-xs font-semibold uppercase tracking-wide text-slate-500">
-                Recommended action
-              </p>
-              <div className="mt-2 rounded-lg border border-blue-100 bg-blue-50 p-3 text-sm leading-6 text-blue-900">
-                {selectedAlert.action}
-              </div>
-            </div>
-
-            <button
-              type="button"
-              onClick={() => onNavigate(selectedAlert.targetPage)}
-              className="flex w-full items-center justify-center gap-2 rounded-lg bg-slate-900 px-4 py-2.5 text-sm font-semibold text-white transition hover:bg-slate-800"
-            >
-              Open {selectedAlert.targetPage}
-              <ArrowRight size={16} />
-            </button>
-          </div>
+          )}
         </section>
       </div>
 
@@ -644,15 +720,20 @@ export default function AlertsNotifications({
         <div className="flex flex-col gap-4 lg:flex-row lg:items-center lg:justify-between">
           <div>
             <div className="flex items-center gap-2">
-              <AlertTriangle size={17} className="text-orange-600" />
+              <AlertTriangle
+                size={17}
+                className="text-orange-600"
+              />
+
               <h2 className="text-sm font-semibold text-slate-900">
                 Priority actions
               </h2>
             </div>
 
             <p className="mt-1 text-xs text-slate-500">
-              Resolve critical planning and resource issues before final block
-              approval.
+              {pendingCount} pending notification
+              {pendingCount === 1 ? "" : "s"} require official
+              attention.
             </p>
           </div>
 
@@ -668,7 +749,9 @@ export default function AlertsNotifications({
 
             <button
               type="button"
-              onClick={() => onNavigate("Resource Readiness")}
+              onClick={() =>
+                onNavigate("Resource Readiness")
+              }
               className="flex items-center gap-2 rounded-lg border border-slate-200 px-3 py-2 text-xs font-semibold text-slate-700 hover:bg-slate-50"
             >
               Check Resources
@@ -682,11 +765,10 @@ export default function AlertsNotifications({
       <div className="rounded-lg border border-dashed border-slate-300 bg-slate-50 px-4 py-3">
         <p className="text-[11px] leading-5 text-slate-500">
           <span className="font-semibold text-slate-700">
-            Prototype note:
+            Prototype data note:
           </span>{" "}
-          Notification records shown here are synthetic demonstration data.
-          Live alerts will be generated from RailSync AI system events and
-          operational data sources.
+          Notifications are generated from the current synthetic
+          railway datasets and RailSync AI decision-support services.
         </p>
       </div>
     </div>

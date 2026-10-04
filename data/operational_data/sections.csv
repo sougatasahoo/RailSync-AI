@@ -1,0 +1,6 @@
+section_code,section_name,start_station,end_station,start_km,end_km,length_km,tracks,electrified
+HWH-SRC,Howrah–Santragachi,HWH,SRC,0.0,12.0,12.0,4,Yes
+SRC-PKU,Santragachi–Panskura,SRC,PKU,12.0,115.0,103.0,4,Yes
+MCA-PKU,Mecheda–Panskura,MCA,PKU,115.0,125.0,10.0,4,Yes
+PKU-KGP,Panskura–Kharagpur,PKU,KGP,125.0,170.0,45.0,4,Yes
+KGP-GID,Kharagpur–Gidni,KGP,GID,170.0,215.0,45.0,2,Yes

@@ -1,0 +1,9 @@
+station_code,station_name,km,station_type,division
+HWH,Howrah,0.0,Terminal,Kharagpur Division
+SER,Santragachi,8.0,Junction,Kharagpur Division
+SRC,Santragachi,12.0,Major,Kharagpur Division
+PKU,Panskura,115.0,Junction,Kharagpur Division
+MCA,Mecheda,118.0,Major,Kharagpur Division
+KGP,Kharagpur,170.0,Junction,Kharagpur Division
+TATA,Tatanagar,185.0,Major,Kharagpur Division
+GID,Gidni,215.0,Major,Kharagpur Division

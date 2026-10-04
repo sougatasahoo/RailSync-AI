@@ -1,0 +1,9 @@
+material_id,department,material_name,unit,available_quantity,minimum_stock,status
+MAT-TMS-001,TMS,Rail Fastening Set,Set,500,100,Available
+MAT-TMS-002,TMS,Rail Welding Consumables,Set,80,20,Available
+MAT-TMS-003,TMS,Sleeper Replacement Unit,Unit,300,60,Available
+MAT-TDMS-001,TDMS,Contact Wire Component,Unit,120,30,Available
+MAT-TDMS-002,TDMS,Insulator Assembly,Unit,75,20,Available
+MAT-SMMS-001,SMMS,Signal Relay,Unit,90,20,Available
+MAT-SMMS-002,SMMS,Point Machine Component,Unit,60,15,Available
+MAT-SMMS-003,SMMS,Axle Counter Module,Unit,40,10,Limited

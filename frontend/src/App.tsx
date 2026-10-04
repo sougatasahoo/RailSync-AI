@@ -1,99 +1,69 @@
-import { useEffect, useState } from "react"
+import { useState } from "react"
 
-import OperationsOverview, {
-  type PageKey,
-} from "./components/OperationsOverview"
+import {
+  Bell,
+  CalendarDays,
+  ClipboardList,
+  FileCheck2,
+  LayoutDashboard,
+  Network,
+  ShieldCheck,
+} from "lucide-react"
 
-import MaintenanceRequests from "./components/MaintenanceRequests"
-import BlockPlanning from "./components/BlockPlanning"
-import ResourceReadiness from "./components/ResourceReadiness"
-import AnalyticsReports from "./components/AnalyticsReports"
-import AlertsNotifications from "./components/AlertsNotifications"
+import Dashboard from "./pages/Dashboard"
+import Maintenance from "./pages/Maintenance"
+import JointOpportunities from "./pages/JointOpportunities"
+import BlockPlanner from "./pages/BlockPlanner"
+import Approvals from "./pages/Approvals"
+import BDMS from "./pages/BDMS"
+
+import type { PageKey } from "./types/navigation"
 
 import "./App.css"
 
-const navigationItems: PageKey[] = [
-  "Operations Overview",
-  "Maintenance Requests",
-  "Block Planning",
-  "Resource Readiness",
-  "Analytics & Reports",
-  "Alerts & Notifications",
+const navigationItems: {
+  key: PageKey
+  label: string
+  icon: typeof LayoutDashboard
+}[] = [
+  {
+    key: "Dashboard",
+    label: "Dashboard",
+    icon: LayoutDashboard,
+  },
+  {
+    key: "Maintenance",
+    label: "Maintenance",
+    icon: ClipboardList,
+  },
+  {
+    key: "Joint Opportunities",
+    label: "Joint Opportunities",
+    icon: Network,
+  },
+  {
+    key: "Block Planner",
+    label: "Block Planner",
+    icon: CalendarDays,
+  },
+  {
+    key: "Approvals",
+    label: "Approvals",
+    icon: ShieldCheck,
+  },
+  {
+    key: "BDMS",
+    label: "BDMS",
+    icon: FileCheck2,
+  },
 ]
-
-type SystemStatusResponse = {
-  systems: Record<string, string>
-  total_systems: number
-  online_systems: number
-}
-
-function ModulePlaceholder({
-  title,
-  description,
-}: {
-  title: string
-  description: string
-}) {
-  return (
-    <div className="page-placeholder">
-      <div className="page-placeholder-icon">●</div>
-      <h1>{title}</h1>
-      <p>{description}</p>
-      <span>Module foundation ready for implementation.</span>
-    </div>
-  )
-}
 
 function App() {
   const [activePage, setActivePage] =
-    useState<PageKey>("Operations Overview")
-
-  const [systemStatus, setSystemStatus] =
-    useState<SystemStatusResponse | null>(null)
-
-  const [backendOnline, setBackendOnline] = useState(false)
-
-  const navigateTo = (page: PageKey) => {
-    setActivePage(page)
-  }
-
-  useEffect(() => {
-    const loadSystemStatus = async () => {
-      try {
-        const response = await fetch(
-          "http://127.0.0.1:8000/api/system-status",
-        )
-
-        if (!response.ok) {
-          throw new Error("Unable to load system status")
-        }
-
-        const data: SystemStatusResponse = await response.json()
-
-        setSystemStatus(data)
-        setBackendOnline(true)
-      } catch {
-        setBackendOnline(false)
-        setSystemStatus(null)
-      }
-    }
-
-    loadSystemStatus()
-
-    const interval = window.setInterval(
-      loadSystemStatus,
-      30000,
-    )
-
-    return () => window.clearInterval(interval)
-  }, [])
-
-  const onlineSystems = systemStatus?.online_systems ?? 0
-  const totalSystems = systemStatus?.total_systems ?? 0
+    useState<PageKey>("Dashboard")
 
   return (
     <div className="app-shell">
-      {/* Sidebar */}
       <aside className="app-sidebar">
         <div className="sidebar-brand">
           <div className="sidebar-logo">
@@ -109,57 +79,69 @@ function App() {
             </div>
 
             <div className="sidebar-subtitle">
-              Railway Operations Platform
+              Railway Block Planning
             </div>
           </div>
         </div>
 
         <div className="division-context">
-          <span>DIVISION</span>
-          <strong>Kharagpur Division</strong>
-          <small>Block Planning</small>
+          <span>PLANNING CONTEXT</span>
+
+          <strong>
+            Kharagpur Division
+          </strong>
+
+          <small>
+            Howrah–Kharagpur Operational Simulation
+          </small>
         </div>
 
         <nav className="sidebar-navigation">
-          {navigationItems.map((item) => (
-            <button
-              key={item}
-              type="button"
-              className={`navigation-item ${
-                activePage === item ? "active" : ""
-              }`}
-              onClick={() => navigateTo(item)}
-            >
-              <span className="navigation-indicator" />
-              <span>{item}</span>
-            </button>
-          ))}
+          {navigationItems.map((item) => {
+            const Icon = item.icon
+
+            return (
+              <button
+                key={item.key}
+                type="button"
+                className={`navigation-item ${
+                  activePage === item.key
+                    ? "active"
+                    : ""
+                }`}
+                onClick={() =>
+                  setActivePage(item.key)
+                }
+              >
+                <Icon
+                  size={17}
+                  strokeWidth={1.8}
+                />
+
+                <span>
+                  {item.label}
+                </span>
+              </button>
+            )
+          })}
         </nav>
 
         <div className="sidebar-bottom">
           <div className="system-status">
             <div className="system-status-header">
-              <span>SYSTEM STATUS</span>
+              <span>
+                SYSTEM STATUS
+              </span>
 
-              <span
-                className={`status-dot ${
-                  backendOnline
-                    ? ""
-                    : "status-dot-offline"
-                }`}
-              />
+              <span className="status-dot" />
             </div>
 
             <strong>
-              {backendOnline
-                ? `${onlineSystems}/${totalSystems} systems online`
-                : "Backend unavailable"}
+              Prototype operational
             </strong>
 
             <small>
-              {backendOnline
-                ? "Operational data synchronized"
-                : "Waiting for RailSync AI API"}
+              Synthetic railway data environment
             </small>
           </div>
 
@@ -181,7 +163,6 @@ function App() {
         </div>
       </aside>
 
-      {/* Main area */}
       <main className="app-main">
         <header className="topbar">
           <div>
@@ -189,30 +170,22 @@ function App() {
               RAILWAY OPERATIONS
             </span>
 
-            <strong>{activePage}</strong>
+            <strong>
+              {activePage}
+            </strong>
           </div>
 
           <div className="topbar-actions">
-            <div className="global-search">
-              <span>⌕</span>
-
-              <input
-                type="text"
-                placeholder="Search requests, blocks, resources..."
-              />
-            </div>
+            <span className="planning-status">
+              PLANNING MODE
+            </span>
 
             <button
               type="button"
-              className="topbar-notification"
-              onClick={() =>
-                navigateTo("Alerts & Notifications")
-              }
-              title="Open alerts and notifications"
+              className="notification-button"
+              title="Notifications"
             >
-              <span className="notification-icon">
-                !
-              </span>
+              <Bell size={17} />
 
               <span className="notification-badge">
                 3
@@ -222,52 +195,53 @@ function App() {
         </header>
 
         <div className="page-container">
-          {activePage === "Operations Overview" && (
-            <OperationsOverview
-              onNavigate={navigateTo}
-            />
-          )}
-
-          {activePage === "Maintenance Requests" && (
-            <MaintenanceRequests
-              onNavigate={navigateTo}
-            />
-          )}
-
-          {activePage === "Block Planning" && (
-            <BlockPlanning
-              onNavigate={navigateTo}
-            />
-          )}
-
-          {activePage === "Resource Readiness" && (
-            <ResourceReadiness
-              onNavigate={navigateTo}
-            />
-          )}
-
-          {activePage === "Analytics & Reports" && (
-            <AnalyticsReports
-              onNavigate={navigateTo}
-            />
-          )}
-
-          {activePage === "Alerts & Notifications" && (
-            <AlertsNotifications
-              onNavigate={navigateTo}
-            />
-          )}
-
-          {!navigationItems.includes(activePage) && (
-            <ModulePlaceholder
-              title={activePage}
-              description="This operational module is part of the RailSync AI platform."
-            />
-          )}
+          <PageContent
+            page={activePage}
+            onNavigate={setActivePage}
+          />
         </div>
       </main>
     </div>
   )
+}
+
+function PageContent({
+  page,
+  onNavigate,
+}: {
+  page: PageKey
+  onNavigate: (page: PageKey) => void
+}) {
+  switch (page) {
+    case "Dashboard":
+      return <Dashboard />
+
+    case "Maintenance":
+      return <Maintenance />
+
+    case "Joint Opportunities":
+      return <JointOpportunities />
+
+    case "Block Planner":
+      return <BlockPlanner />
+
+    case "Approvals":
+      return (
+        <Approvals
+          onNavigate={onNavigate}
+        />
+      )
+
+    case "BDMS":
+      return (
+        <BDMS
+          onNavigate={onNavigate}
+        />
+      )
+
+    default:
+      return null
+  }
 }
 
 export default App

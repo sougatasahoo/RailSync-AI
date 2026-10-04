@@ -1,4 +1,12 @@
-fastapi==0.141.1
-uvicorn==0.53.0
-pandas==3.0.6
-numpy==2.5.3
+fastapi
+uvicorn[standard]
+sqlalchemy
+pydantic
+pydantic-settings
+pandas
+numpy
+scikit-learn
+xgboost
+shap
+ortools
+python-dotenv

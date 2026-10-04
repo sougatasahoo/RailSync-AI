@@ -1,0 +1,4 @@
+event_id,event_date,event_type,description,severity
+EVT-001,2026-10-02,Festival traffic,Higher passenger movement expected during selected operating periods.,Medium
+EVT-002,2026-10-02,VIP movement,Temporary operational priority may restrict maintenance access.,High
+EVT-003,2026-10-02,Planned engineering activity,Representative engineering work affecting selected sections.,Medium

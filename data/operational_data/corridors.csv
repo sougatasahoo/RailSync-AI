@@ -1,0 +1,4 @@
+corridor_id,corridor_name,start_station,end_station,start_km,end_km,length_km,operational_priority
+COR-001,Howrah–Kharagpur Main Corridor,HWH,KGP,0.0,170.0,170.0,Very High
+COR-002,Kharagpur–Gidni Corridor,KGP,GID,170.0,215.0,45.0,High
+COR-003,Mecheda–Panskura Operational Segment,MCA,PKU,115.0,125.0,10.0,High

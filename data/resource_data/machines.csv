@@ -1,0 +1,8 @@
+machine_id,department,machine_name,machine_type,quantity,status,location_section
+MCH-TMS-001,TMS,Track Geometry Machine,Track Machine,1,Available,PKU-KGP
+MCH-TMS-002,TMS,Tamping Machine,Track Machine,1,Available,SRC-PKU
+MCH-TMS-003,TMS,Rail Welding Unit,Rail Welding Team,1,Limited,PKU-KGP
+MCH-TDMS-001,TDMS,OHE Tower Wagon,OHE Tower Wagon,1,Available,PKU-KGP
+MCH-TDMS-002,TDMS,OHE Inspection Vehicle,Electrical Inspection Team,1,Available,SRC-PKU
+MCH-SMMS-001,SMMS,Signal Testing Equipment,Signal Testing Team,2,Available,PKU-KGP
+MCH-SMMS-002,SMMS,Point Machine Testing Kit,Point Machine Team,2,Available,SRC-PKU

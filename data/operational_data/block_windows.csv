@@ -1,0 +1,26 @@
+block_window_id,window_date,section_code,section_name,start_time,end_time,window_type,capacity,preferred_for_maintenance
+BLK-20261002-0001,2026-10-02,HWH-SRC,Howrah–Santragachi,00:30,03:00,Night maintenance window,High,Yes
+BLK-20261002-0002,2026-10-02,HWH-SRC,Howrah–Santragachi,03:30,05:00,Pre-service maintenance window,Medium,Yes
+BLK-20261002-0003,2026-10-02,HWH-SRC,Howrah–Santragachi,10:30,12:30,Midday maintenance window,Low,Conditional
+BLK-20261002-0004,2026-10-02,HWH-SRC,Howrah–Santragachi,12:45,14:30,Afternoon maintenance window,Low,Conditional
+BLK-20261002-0005,2026-10-02,HWH-SRC,Howrah–Santragachi,22:30,23:59,Late-night maintenance window,Low,Conditional
+BLK-20261002-0006,2026-10-02,SRC-PKU,Santragachi–Panskura,00:30,03:00,Night maintenance window,High,Yes
+BLK-20261002-0007,2026-10-02,SRC-PKU,Santragachi–Panskura,03:30,05:00,Pre-service maintenance window,Medium,Yes
+BLK-20261002-0008,2026-10-02,SRC-PKU,Santragachi–Panskura,10:30,12:30,Midday maintenance window,Low,Conditional
+BLK-20261002-0009,2026-10-02,SRC-PKU,Santragachi–Panskura,12:45,14:30,Afternoon maintenance window,Low,Conditional
+BLK-20261002-0010,2026-10-02,SRC-PKU,Santragachi–Panskura,22:30,23:59,Late-night maintenance window,Low,Conditional
+BLK-20261002-0011,2026-10-02,MCA-PKU,Mecheda–Panskura,00:30,03:00,Night maintenance window,High,Yes
+BLK-20261002-0012,2026-10-02,MCA-PKU,Mecheda–Panskura,03:30,05:00,Pre-service maintenance window,Medium,Yes
+BLK-20261002-0013,2026-10-02,MCA-PKU,Mecheda–Panskura,10:30,12:30,Midday maintenance window,Low,Conditional
+BLK-20261002-0014,2026-10-02,MCA-PKU,Mecheda–Panskura,12:45,14:30,Afternoon maintenance window,Low,Conditional
+BLK-20261002-0015,2026-10-02,MCA-PKU,Mecheda–Panskura,22:30,23:59,Late-night maintenance window,Low,Conditional
+BLK-20261002-0016,2026-10-02,PKU-KGP,Panskura–Kharagpur,00:30,03:00,Night maintenance window,High,Yes
+BLK-20261002-0017,2026-10-02,PKU-KGP,Panskura–Kharagpur,03:30,05:00,Pre-service maintenance window,Medium,Yes
+BLK-20261002-0018,2026-10-02,PKU-KGP,Panskura–Kharagpur,10:30,12:30,Midday maintenance window,Low,Conditional
+BLK-20261002-0019,2026-10-02,PKU-KGP,Panskura–Kharagpur,12:45,14:30,Afternoon maintenance window,Low,Conditional
+BLK-20261002-0020,2026-10-02,PKU-KGP,Panskura–Kharagpur,22:30,23:59,Late-night maintenance window,Low,Conditional
+BLK-20261002-0021,2026-10-02,KGP-GID,Kharagpur–Gidni,00:30,03:00,Night maintenance window,High,Yes
+BLK-20261002-0022,2026-10-02,KGP-GID,Kharagpur–Gidni,03:30,05:00,Pre-service maintenance window,Medium,Yes
+BLK-20261002-0023,2026-10-02,KGP-GID,Kharagpur–Gidni,10:30,12:30,Midday maintenance window,Low,Conditional
+BLK-20261002-0024,2026-10-02,KGP-GID,Kharagpur–Gidni,12:45,14:30,Afternoon maintenance window,Low,Conditional
+BLK-20261002-0025,2026-10-02,KGP-GID,Kharagpur–Gidni,22:30,23:59,Late-night maintenance window,Low,Conditional

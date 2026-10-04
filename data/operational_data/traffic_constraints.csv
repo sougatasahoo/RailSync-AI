@@ -1,0 +1,21 @@
+traffic_constraint_id,window_date,section_code,section_name,start_time,end_time,constraint_type,severity
+TRF-20261002-0001,2026-10-02,HWH-SRC,Howrah–Santragachi,06:00,08:00,Morning peak traffic,High
+TRF-20261002-0002,2026-10-02,HWH-SRC,Howrah–Santragachi,08:00,10:30,Operational traffic,Medium
+TRF-20261002-0003,2026-10-02,HWH-SRC,Howrah–Santragachi,17:00,20:00,Evening peak traffic,High
+TRF-20261002-0004,2026-10-02,HWH-SRC,Howrah–Santragachi,20:00,22:00,Reduced traffic,Medium
+TRF-20261002-0005,2026-10-02,SRC-PKU,Santragachi–Panskura,06:00,08:00,Morning peak traffic,High
+TRF-20261002-0006,2026-10-02,SRC-PKU,Santragachi–Panskura,08:00,10:30,Operational traffic,Medium
+TRF-20261002-0007,2026-10-02,SRC-PKU,Santragachi–Panskura,17:00,20:00,Evening peak traffic,High
+TRF-20261002-0008,2026-10-02,SRC-PKU,Santragachi–Panskura,20:00,22:00,Reduced traffic,Medium
+TRF-20261002-0009,2026-10-02,MCA-PKU,Mecheda–Panskura,06:00,08:00,Morning peak traffic,High
+TRF-20261002-0010,2026-10-02,MCA-PKU,Mecheda–Panskura,08:00,10:30,Operational traffic,Medium
+TRF-20261002-0011,2026-10-02,MCA-PKU,Mecheda–Panskura,17:00,20:00,Evening peak traffic,High
+TRF-20261002-0012,2026-10-02,MCA-PKU,Mecheda–Panskura,20:00,22:00,Reduced traffic,Medium
+TRF-20261002-0013,2026-10-02,PKU-KGP,Panskura–Kharagpur,06:00,08:00,Morning peak traffic,High
+TRF-20261002-0014,2026-10-02,PKU-KGP,Panskura–Kharagpur,08:00,10:30,Operational traffic,Medium
+TRF-20261002-0015,2026-10-02,PKU-KGP,Panskura–Kharagpur,17:00,20:00,Evening peak traffic,High
+TRF-20261002-0016,2026-10-02,PKU-KGP,Panskura–Kharagpur,20:00,22:00,Reduced traffic,Medium
+TRF-20261002-0017,2026-10-02,KGP-GID,Kharagpur–Gidni,06:00,08:00,Morning peak traffic,High
+TRF-20261002-0018,2026-10-02,KGP-GID,Kharagpur–Gidni,08:00,10:30,Operational traffic,Medium
+TRF-20261002-0019,2026-10-02,KGP-GID,Kharagpur–Gidni,17:00,20:00,Evening peak traffic,High
+TRF-20261002-0020,2026-10-02,KGP-GID,Kharagpur–Gidni,20:00,22:00,Reduced traffic,Medium

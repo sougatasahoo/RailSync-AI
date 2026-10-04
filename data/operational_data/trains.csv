@@ -1,0 +1,17 @@
+train_id,train_number,train_name,service_type,origin,destination,direction,priority_class,avg_speed_kmph
+TRN-12001,12001,Howrah–Kharagpur Express,Express,HWH,KGP,Down,High,75
+TRN-12002,12002,Kharagpur–Howrah Express,Express,KGP,HWH,Up,High,75
+TRN-12801,12801,Puri–New Delhi Superfast,Superfast,KGP,HWH,Up,Very High,85
+TRN-12802,12802,New Delhi–Puri Superfast,Superfast,HWH,KGP,Down,Very High,85
+TRN-18001,18001,Howrah–Kharagpur Local,Passenger,HWH,KGP,Down,Medium,50
+TRN-18002,18002,Kharagpur–Howrah Local,Passenger,KGP,HWH,Up,Medium,50
+TRN-22641,22641,Chennai–Howrah Superfast,Superfast,KGP,HWH,Up,Very High,82
+TRN-22642,22642,Howrah–Chennai Superfast,Superfast,HWH,KGP,Down,Very High,82
+TRN-58001,58001,Howrah–Kharagpur Passenger,Passenger,HWH,GID,Down,Medium,45
+TRN-58002,58002,Gidni–Howrah Passenger,Passenger,GID,HWH,Up,Medium,45
+TRN-68001,68001,Kharagpur–Gidni Local,Passenger,KGP,GID,Down,Low,40
+TRN-68002,68002,Gidni–Kharagpur Local,Passenger,GID,KGP,Up,Low,40
+TRN-FRT01,FRT01,Freight Service 01,Freight,HWH,KGP,Down,Low,40
+TRN-FRT02,FRT02,Freight Service 02,Freight,KGP,HWH,Up,Low,40
+TRN-FRT03,FRT03,Freight Service 03,Freight,HWH,GID,Down,Low,38
+TRN-FRT04,FRT04,Freight Service 04,Freight,GID,HWH,Up,Low,38
